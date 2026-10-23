@@ -78,10 +78,28 @@ describe('waves and game state machine', () => {
     expect(state.audioEvents).toContain('GAME_CLEAR');
   });
 
-  it('defines 5 default waves within the 240x400 playfield', () => {
+  it('defines 5 default waves within the 240x400 playfield and completes a full 5-wave sensor simulation', () => {
     expect(DEFAULT_WAVES.length).toBe(5);
     for (const wave of DEFAULT_WAVES) {
       expect(wave.targets.length).toBeGreaterThanOrEqual(1);
     }
+
+    // Simulate a full playthrough across all 5 DEFAULT_WAVES
+    let state = startCountdown(createInitialGameState(null));
+    state = stepGame(state, state.crosshair, COUNTDOWN_DURATION_MS + 16, DEFAULT_WAVES);
+    expect(state.phase).toBe('PLAYING');
+
+    let safetyFrames = 0;
+    while (state.phase === 'PLAYING' && safetyFrames < 200) {
+      const nextTarget = state.targets.find((t) => !t.hit);
+      expect(nextTarget).toBeDefined();
+      state = stepGame(state, nextTarget!.position, 16, DEFAULT_WAVES);
+      safetyFrames++;
+    }
+
+    expect(state.phase).toBe('RESULT');
+    expect(state.isNewRecord).toBe(true);
+    expect(state.elapsedMs).toBeGreaterThan(0);
+    expect(state.fullTrace.length).toBeGreaterThan(5);
   });
 });
