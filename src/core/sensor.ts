@@ -107,6 +107,46 @@ export function stepCrosshairFromMotion(
   };
 }
 
+export interface PermissionTarget {
+  requestPermission?: () => Promise<'granted' | 'denied'>;
+}
+
+export async function requestSensorPermissions(
+  motionTarget?: PermissionTarget,
+  orientationTarget?: PermissionTarget
+): Promise<boolean> {
+  if (motionTarget && typeof motionTarget.requestPermission === 'function') {
+    try {
+      const result = await motionTarget.requestPermission();
+      return result === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  if (orientationTarget && typeof orientationTarget.requestPermission === 'function') {
+    try {
+      const result = await orientationTarget.requestPermission();
+      return result === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function shouldApplyPointerFallback(
+  hasMotionEvents: boolean,
+  pointerType: string,
+  buttons: number
+): boolean {
+  if (hasMotionEvents) {
+    return false;
+  }
+  return pointerType === 'mouse' || buttons > 0;
+}
+
 export function stepCrosshairFromOrientation(
   state: SensorState,
   sample: OrientationSample,

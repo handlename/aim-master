@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   PLAYFIELD_CENTER,
   createInitialSensorState,
+  requestSensorPermissions,
   resetCenter,
+  shouldApplyPointerFallback,
   stepCrosshairFromMotion,
   stepCrosshairFromOrientation,
 } from './sensor';
@@ -93,5 +95,38 @@ describe('sensor core', () => {
   it('resets crosshair back to PLAYFIELD_CENTER', () => {
     const moved = { ...createInitialSensorState(), crosshair: { x: 200, y: 80 } };
     expect(resetCenter(moved).crosshair).toEqual(PLAYFIELD_CENTER);
+  });
+
+  it('invokes requestPermission with bound receiver context (this === constructor) and avoids second prompt when motion permission exists', async () => {
+    let orientCalled = false;
+    const fakeMotionTarget = {
+      expectedThis: true,
+      async requestPermission(this: { expectedThis?: boolean }) {
+        if (!this || !this.expectedThis) {
+          throw new TypeError('Illegal invocation');
+        }
+        return 'granted' as const;
+      },
+    };
+    const fakeOrientTarget = {
+      expectedThis: true,
+      async requestPermission(this: { expectedThis?: boolean }) {
+        if (!this || !this.expectedThis) {
+          throw new TypeError('Illegal invocation');
+        }
+        orientCalled = true;
+        return 'granted' as const;
+      },
+    };
+
+    const granted = await requestSensorPermissions(fakeMotionTarget, fakeOrientTarget);
+    expect(granted).toBe(true);
+    expect(orientCalled).toBe(false);
+  });
+
+  it('ignores touch pointer fallback when motion sensors are active to prevent accidental palm jumps', () => {
+    expect(shouldApplyPointerFallback(true, 'touch', 1)).toBe(false);
+    expect(shouldApplyPointerFallback(false, 'touch', 1)).toBe(true);
+    expect(shouldApplyPointerFallback(false, 'mouse', 0)).toBe(true);
   });
 });

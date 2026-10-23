@@ -2,8 +2,11 @@ import { createInitialGameState, startCountdown, stepGame } from './core/game';
 import { clampPoint } from './core/geometry';
 import {
   PLAYFIELD_BOUNDS,
+  PermissionTarget,
   createInitialSensorState,
+  requestSensorPermissions,
   resetCenter,
+  shouldApplyPointerFallback,
   stepCrosshairFromMotion,
   stepCrosshairFromOrientation,
 } from './core/sensor';
@@ -12,10 +15,6 @@ import { RetroAudio } from './shell/audio';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, renderGame } from './shell/renderer';
 import { ResultCardData, generateResultCardBlob, shareResult } from './shell/share';
 import { formatTimeSeconds, loadBestTime, saveBestTime } from './shell/storage';
-
-interface IOSPermissionEvent {
-  requestPermission?: () => Promise<'granted' | 'denied'>;
-}
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -34,27 +33,21 @@ let sensorState = createInitialSensorState();
 let gameState = createInitialGameState(loadBestTime());
 
 let hasMotionEvents = false;
+let isStartingRun = false;
 let lastMotionTimestampMs: number | null = null;
 let latestResultBlob: Blob | null = null;
 let latestResultData: ResultCardData | null = null;
 
 async function requestSensorPermissionsIfNeeded(): Promise<void> {
-  const motionPerm = (DeviceMotionEvent as unknown as IOSPermissionEvent).requestPermission;
-  if (typeof motionPerm === 'function') {
-    try {
-      await motionPerm();
-    } catch {
-      // Continue with fallback if denied
-    }
-  }
-  const orientPerm = (DeviceOrientationEvent as unknown as IOSPermissionEvent).requestPermission;
-  if (typeof orientPerm === 'function') {
-    try {
-      await orientPerm();
-    } catch {
-      // Continue with fallback if denied
-    }
-  }
+  const motionCtor =
+    typeof DeviceMotionEvent !== 'undefined'
+      ? (DeviceMotionEvent as unknown as PermissionTarget)
+      : undefined;
+  const orientCtor =
+    typeof DeviceOrientationEvent !== 'undefined'
+      ? (DeviceOrientationEvent as unknown as PermissionTarget)
+      : undefined;
+  await requestSensorPermissions(motionCtor, orientCtor);
 }
 
 window.addEventListener('devicemotion', (event: DeviceMotionEvent) => {
@@ -117,13 +110,20 @@ function updateCrosshairFromPointer(clientX: number, clientY: number): void {
 }
 
 canvas.addEventListener('pointermove', (e: PointerEvent) => {
-  if (e.pointerType === 'mouse' || e.buttons > 0) {
+  if (shouldApplyPointerFallback(hasMotionEvents, e.pointerType, e.buttons)) {
     updateCrosshairFromPointer(e.clientX, e.clientY);
   }
 });
 
 canvas.addEventListener('pointerdown', (e: PointerEvent) => {
-  updateCrosshairFromPointer(e.clientX, e.clientY);
+  const rect = canvas.getBoundingClientRect();
+  if (rect.height > 0 && ((e.clientY - rect.top) / rect.height) * LOGICAL_HEIGHT >= 356) {
+    sensorState = resetCenter(sensorState);
+    return;
+  }
+  if (shouldApplyPointerFallback(hasMotionEvents, e.pointerType, 1)) {
+    updateCrosshairFromPointer(e.clientX, e.clientY);
+  }
 });
 
 resetCenterBtn.addEventListener('click', () => {
@@ -131,16 +131,28 @@ resetCenterBtn.addEventListener('click', () => {
 });
 
 async function beginGameRun(): Promise<void> {
-  audio.unlock();
-  await requestSensorPermissionsIfNeeded();
-  lastMotionTimestampMs = null;
-  sensorState = resetCenter(sensorState);
-  gameState = startCountdown(gameState, sensorState.crosshair);
-  for (const ev of gameState.audioEvents) {
-    audio.play(ev);
+  if (isStartingRun) {
+    return;
   }
-  titleOverlay.classList.add('hidden');
-  resultOverlay.classList.add('hidden');
+  isStartingRun = true;
+  startBtn.disabled = true;
+  retryBtn.disabled = true;
+  try {
+    audio.unlock();
+    await requestSensorPermissionsIfNeeded();
+    lastMotionTimestampMs = null;
+    sensorState = resetCenter(sensorState);
+    gameState = startCountdown(gameState, sensorState.crosshair);
+    for (const ev of gameState.audioEvents) {
+      audio.play(ev);
+    }
+    titleOverlay.classList.add('hidden');
+    resultOverlay.classList.add('hidden');
+  } finally {
+    isStartingRun = false;
+    startBtn.disabled = false;
+    retryBtn.disabled = false;
+  }
 }
 
 startBtn.addEventListener('click', () => {
