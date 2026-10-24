@@ -1,4 +1,4 @@
-import { ActiveTarget, GameState } from '../core/game';
+import { ActiveTarget, GameState, isPenaltyTarget } from '../core/game';
 import { formatTimeSeconds } from './storage';
 
 export const LOGICAL_WIDTH = 240;
@@ -96,7 +96,6 @@ export function computeFireworkParticles(timeMs: number): readonly FireworkParti
     } else {
       // Radial 8-bit spark burst
       const burstT = (progress - 0.22) / 0.78;
-      // Ease out expansion + slight gravity droop
       const easeOut = 1 - (1 - burstT) * (1 - burstT);
       const outerR = launcher.maxRadius * easeOut;
       const innerR = outerR * 0.55;
@@ -145,7 +144,34 @@ function drawTarget(ctx: CanvasRenderingContext2D, target: ActiveTarget): void {
   ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // Concentric 8-bit bullseye rings
+  if (isPenaltyTarget(target.blueprint)) {
+    // Hazard / Penalty target: Purple-Yellow outer ring, dark core, and bold 'X' mark
+    const penaltyRings = [
+      { radius: r, color: '#ffcc00' },
+      { radius: Math.max(2, Math.round(r * 0.78)), color: '#660099' },
+      { radius: Math.max(2, Math.round(r * 0.52)), color: '#1a002c' },
+    ];
+    for (const ring of penaltyRings) {
+      ctx.fillStyle = ring.color;
+      ctx.beginPath();
+      ctx.arc(x, y, ring.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw bold 'X' across the penalty target
+    const span = Math.max(4, Math.round(r * 0.45));
+    ctx.strokeStyle = '#ff3366';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - span, y - span);
+    ctx.lineTo(x + span, y + span);
+    ctx.moveTo(x + span, y - span);
+    ctx.lineTo(x - span, y + span);
+    ctx.stroke();
+    return;
+  }
+
+  // Normal target: concentric 8-bit red/white bullseye rings
   const rings = [
     { radius: r, color: '#ff3333' },
     { radius: Math.max(2, Math.round(r * 0.7)), color: '#ffffff' },
@@ -210,7 +236,6 @@ export function renderGame(
   ctx.imageSmoothingEnabled = false;
 
   // Square Playfield sky background (y: 32..272 is 240x240)
-  // Slightly brighter navy on TITLE/RESULT so crosshair movement is crystal clear while tuning options
   ctx.fillStyle =
     state.phase === 'TITLE' || state.phase === 'RESULT' ? '#1c1c3c' : '#14142b';
   ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
@@ -250,8 +275,9 @@ export function renderGame(
   ctx.fillStyle = '#ffcc00';
   ctx.fillText(formatTimeSeconds(state.elapsedMs), 34, 15);
 
-  const remainingTargets = state.targets.filter((t) => !t.hit).length;
-  const totalWaveTargets = state.targets.length;
+  const normalTargets = state.targets.filter((t) => !isPenaltyTarget(t.blueprint));
+  const remainingTargets = normalTargets.filter((t) => !t.hit).length;
+  const totalWaveTargets = normalTargets.length;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillText('WV', 98, 15);
@@ -272,35 +298,40 @@ export function renderGame(
   for (const effect of state.hitEffects) {
     const ex = Math.round(effect.position.x);
     const ey = Math.round(effect.position.y);
-    ctx.fillStyle = '#ffff00';
-    ctx.fillRect(ex - 10, ey - 2, 20, 4);
-    ctx.fillRect(ex - 2, ey - 10, 4, 20);
-    ctx.fillStyle = '#ff5555';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('HIT!', ex - 12, ey - 14);
+    if (effect.kind === 'penalty') {
+      ctx.fillStyle = '#ff3366';
+      ctx.fillRect(ex - 10, ey - 2, 20, 4);
+      ctx.fillRect(ex - 2, ey - 10, 4, 20);
+      ctx.fillStyle = '#ffcc00';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('+1.0s!', ex - 18, ey - 14);
+    } else {
+      ctx.fillStyle = '#ffff00';
+      ctx.fillRect(ex - 10, ey - 2, 20, 4);
+      ctx.fillRect(ex - 2, ey - 10, 4, 20);
+      ctx.fillStyle = '#ff5555';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('HIT!', ex - 12, ey - 14);
+    }
   }
 
   // Phase overlays (drawn BEFORE crosshair so the crosshair stays visible on top!)
   if (state.phase === 'TITLE') {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(20, 56, LOGICAL_WIDTH - 40, 96);
+    ctx.fillRect(20, 62, LOGICAL_WIDTH - 40, 78);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(20, 56, LOGICAL_WIDTH - 40, 96);
+    ctx.strokeRect(20, 62, LOGICAL_WIDTH - 40, 78);
 
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 20px monospace';
-    ctx.fillText('AIM MASTER', 56, 84);
-
-    ctx.fillStyle = '#00ffcc';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('8-BIT QUICK DRAW', 68, 106);
+    ctx.fillText('AIM MASTER', 56, 88);
 
     const bestLabel =
       state.bestTimeMs !== null ? `BEST: ${formatTimeSeconds(state.bestTimeMs)}s` : 'BEST: --.---s';
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(bestLabel, 66, 132);
+    ctx.fillText(bestLabel, 66, 118);
   } else if (state.phase === 'COUNTDOWN') {
     const sec = Math.ceil(state.countdownRemainingMs / 600);
     const label = sec >= 1 ? `READY... ${sec}` : 'GO!';

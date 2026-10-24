@@ -13,6 +13,7 @@ export type GameAudioEvent =
   | 'COUNTDOWN_TICK'
   | 'COUNTDOWN_GO'
   | 'TARGET_HIT'
+  | 'PENALTY_HIT'
   | 'WAVE_CLEAR'
   | 'GAME_CLEAR';
 
@@ -25,6 +26,7 @@ export interface ActiveTarget {
 export interface HitEffect {
   readonly position: Point;
   readonly remainingMs: number;
+  readonly kind?: 'normal' | 'penalty';
 }
 
 export interface TrailPoint {
@@ -52,10 +54,19 @@ export interface GameState {
 export const CROSSHAIR_HIT_RADIUS = 4;
 export const COUNTDOWN_DURATION_MS = 1800;
 
-const HIT_EFFECT_DURATION_MS = 220;
+const HIT_EFFECT_DURATION_MS = 260;
 const TRAIL_MAX_AGE_MS = 180;
 const MAX_FULL_TRACE_POINTS = 600;
 const MAX_PLAYING_DT_MS = 50;
+
+export function isPenaltyTarget(blueprint: TargetBlueprint): boolean {
+  return (blueprint.penaltyMs ?? 0) > 0;
+}
+
+function areAllNormalTargetsHit(targets: readonly ActiveTarget[]): boolean {
+  const normalTargets = targets.filter((t) => !isPenaltyTarget(t.blueprint));
+  return normalTargets.length > 0 && normalTargets.every((t) => t.hit);
+}
 
 function spawnWaveTargets(wave: WaveDefinition): readonly ActiveTarget[] {
   return wave.targets.map((blueprint) => ({
@@ -122,9 +133,14 @@ function evaluateSweptHits(
   waveElapsedSec: number
 ): {
   readonly updatedTargets: readonly ActiveTarget[];
-  readonly newlyHitPositions: readonly Point[];
+  readonly newlyHitNormalPositions: readonly Point[];
+  readonly newlyHitPenaltyPositions: readonly Point[];
+  readonly addedPenaltyMs: number;
 } {
-  const newlyHitPositions: Point[] = [];
+  const newlyHitNormalPositions: Point[] = [];
+  const newlyHitPenaltyPositions: Point[] = [];
+  let addedPenaltyMs = 0;
+
   const updatedTargets = targets.map((target) => {
     const position = evaluateTargetPosition(target.blueprint, waveElapsedSec);
     if (target.hit) {
@@ -133,13 +149,23 @@ function evaluateSweptHits(
     const hitRadius = target.blueprint.radius + CROSSHAIR_HIT_RADIUS;
     const isHit = segmentCircleIntersect(prevCrosshair, nextCrosshair, position, hitRadius);
     if (isHit) {
-      newlyHitPositions.push(position);
+      if (isPenaltyTarget(target.blueprint)) {
+        newlyHitPenaltyPositions.push(position);
+        addedPenaltyMs += target.blueprint.penaltyMs ?? 0;
+      } else {
+        newlyHitNormalPositions.push(position);
+      }
       return { ...target, position, hit: true };
     }
     return { ...target, position };
   });
 
-  return { updatedTargets, newlyHitPositions };
+  return {
+    updatedTargets,
+    newlyHitNormalPositions,
+    newlyHitPenaltyPositions,
+    addedPenaltyMs,
+  };
 }
 
 export function stepGame(
@@ -181,24 +207,34 @@ export function stepGame(
     audioEvents.push('COUNTDOWN_GO');
     const firstWave = waves[0];
     const initialTargets = firstWave ? spawnWaveTargets(firstWave) : [];
-    const { updatedTargets, newlyHitPositions } = evaluateSweptHits(
-      initialTargets,
-      nextCrosshair,
-      nextCrosshair,
-      0
-    );
+    const {
+      updatedTargets,
+      newlyHitNormalPositions,
+      newlyHitPenaltyPositions,
+      addedPenaltyMs,
+    } = evaluateSweptHits(initialTargets, nextCrosshair, nextCrosshair, 0);
 
-    if (newlyHitPositions.length > 0) {
+    if (newlyHitNormalPositions.length > 0) {
       audioEvents.push('TARGET_HIT');
     }
+    if (newlyHitPenaltyPositions.length > 0) {
+      audioEvents.push('PENALTY_HIT');
+    }
 
-    const hitEffects: HitEffect[] = newlyHitPositions.map((position) => ({
-      position,
-      remainingMs: HIT_EFFECT_DURATION_MS,
-    }));
+    const hitEffects: HitEffect[] = [
+      ...newlyHitNormalPositions.map((position) => ({
+        position,
+        remainingMs: HIT_EFFECT_DURATION_MS,
+        kind: 'normal' as const,
+      })),
+      ...newlyHitPenaltyPositions.map((position) => ({
+        position,
+        remainingMs: HIT_EFFECT_DURATION_MS,
+        kind: 'penalty' as const,
+      })),
+    ];
 
-    const allHit = updatedTargets.length > 0 && updatedTargets.every((t) => t.hit);
-    if (allHit && waves.length > 1) {
+    if (areAllNormalTargetsHit(updatedTargets) && waves.length > 1) {
       audioEvents.push('WAVE_CLEAR');
       return {
         ...state,
@@ -206,7 +242,7 @@ export function stepGame(
         countdownRemainingMs: 0,
         waveIndex: 1,
         waveElapsedMs: 0,
-        elapsedMs: 0,
+        elapsedMs: addedPenaltyMs,
         crosshair: nextCrosshair,
         targets: spawnWaveTargets(waves[1]),
         hitEffects,
@@ -222,7 +258,7 @@ export function stepGame(
       countdownRemainingMs: 0,
       waveIndex: 0,
       waveElapsedMs: 0,
-      elapsedMs: 0,
+      elapsedMs: addedPenaltyMs,
       crosshair: nextCrosshair,
       targets: updatedTargets,
       hitEffects,
@@ -234,20 +270,24 @@ export function stepGame(
 
   // state.phase === 'PLAYING'
   const clampedDt = Math.min(MAX_PLAYING_DT_MS, Math.max(0, dtMs));
-  const nextElapsedMs = state.elapsedMs + clampedDt;
   const nextWaveElapsedMs = state.waveElapsedMs + clampedDt;
   const waveElapsedSec = nextWaveElapsedMs / 1000;
 
-  const { updatedTargets, newlyHitPositions } = evaluateSweptHits(
-    state.targets,
-    state.crosshair,
-    nextCrosshair,
-    waveElapsedSec
-  );
+  const {
+    updatedTargets,
+    newlyHitNormalPositions,
+    newlyHitPenaltyPositions,
+    addedPenaltyMs,
+  } = evaluateSweptHits(state.targets, state.crosshair, nextCrosshair, waveElapsedSec);
+
+  const nextElapsedMs = state.elapsedMs + clampedDt + addedPenaltyMs;
 
   const audioEvents: GameAudioEvent[] = [];
-  if (newlyHitPositions.length > 0) {
+  if (newlyHitNormalPositions.length > 0) {
     audioEvents.push('TARGET_HIT');
+  }
+  if (newlyHitPenaltyPositions.length > 0) {
+    audioEvents.push('PENALTY_HIT');
   }
 
   const agedEffects = state.hitEffects
@@ -255,9 +295,15 @@ export function stepGame(
     .filter((ef) => ef.remainingMs > 0);
   const hitEffects: readonly HitEffect[] = [
     ...agedEffects,
-    ...newlyHitPositions.map((position) => ({
+    ...newlyHitNormalPositions.map((position) => ({
       position,
       remainingMs: HIT_EFFECT_DURATION_MS,
+      kind: 'normal' as const,
+    })),
+    ...newlyHitPenaltyPositions.map((position) => ({
+      position,
+      remainingMs: HIT_EFFECT_DURATION_MS,
+      kind: 'penalty' as const,
     })),
   ];
 
@@ -267,8 +313,7 @@ export function stepGame(
       ? [...state.fullTrace, nextCrosshair]
       : state.fullTrace;
 
-  const allCleared = updatedTargets.length > 0 && updatedTargets.every((t) => t.hit);
-  if (!allCleared) {
+  if (!areAllNormalTargetsHit(updatedTargets)) {
     return {
       ...state,
       elapsedMs: nextElapsedMs,

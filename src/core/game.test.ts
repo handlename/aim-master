@@ -78,20 +78,61 @@ describe('waves and game state machine', () => {
     expect(state.audioEvents).toContain('GAME_CLEAR');
   });
 
-  it('defines 10 default waves within the 240x400 playfield and completes a full 10-wave sensor simulation', () => {
+  it('adds penalty time when hitting a penalty target and clears the wave when only normal targets are hit', () => {
+    const wavesWithPenalty: readonly WaveDefinition[] = [
+      {
+        waveNumber: 1,
+        label: 'WAVE 1',
+        targets: [
+          { id: 'normal-1', anchorX: 60, anchorY: 152, radius: 14, motion: { kind: 'static' } },
+          {
+            id: 'penalty-1',
+            anchorX: 180,
+            anchorY: 152,
+            radius: 14,
+            penaltyMs: 1000,
+            motion: { kind: 'static' },
+          },
+        ],
+      },
+    ];
+
+    let state = startCountdown(createInitialGameState(null), { x: 180, y: 60 });
+    state = stepGame(state, { x: 180, y: 60 }, COUNTDOWN_DURATION_MS + 10, wavesWithPenalty);
+    expect(state.phase).toBe('PLAYING');
+
+    // Sweep across the penalty target at (180, 152) first
+    state = stepGame(state, { x: 180, y: 220 }, 20, wavesWithPenalty);
+    expect(state.phase).toBe('PLAYING'); // Wave not cleared yet because normal-1 is unhit
+    expect(state.elapsedMs).toBe(1020); // 20ms frame + 1000ms penalty!
+    expect(state.audioEvents).toContain('PENALTY_HIT');
+
+    // Now sweep across the normal target at (60, 152) -> clears wave immediately without needing penalty target
+    state = stepGame(state, { x: 60, y: 100 }, 20, wavesWithPenalty);
+    state = stepGame(state, { x: 60, y: 220 }, 20, wavesWithPenalty);
+    expect(state.phase).toBe('RESULT');
+    expect(state.elapsedMs).toBe(1060);
+  });
+
+  it('defines 10 default waves with penalty targets in later waves and completes a full 10-wave sensor simulation', () => {
     expect(DEFAULT_WAVES.length).toBe(10);
     for (const wave of DEFAULT_WAVES) {
       expect(wave.targets.length).toBeGreaterThanOrEqual(1);
     }
+    const laterWavesPenaltyCount = DEFAULT_WAVES.slice(5).reduce(
+      (acc, w) => acc + w.targets.filter((t) => (t.penaltyMs ?? 0) > 0).length,
+      0
+    );
+    expect(laterWavesPenaltyCount).toBeGreaterThanOrEqual(4);
 
-    // Simulate a full playthrough across all 5 DEFAULT_WAVES
+    // Simulate a full playthrough across all 10 DEFAULT_WAVES hitting only normal targets
     let state = startCountdown(createInitialGameState(null));
     state = stepGame(state, state.crosshair, COUNTDOWN_DURATION_MS + 16, DEFAULT_WAVES);
     expect(state.phase).toBe('PLAYING');
 
     let safetyFrames = 0;
     while (state.phase === 'PLAYING' && safetyFrames < 200) {
-      const nextTarget = state.targets.find((t) => !t.hit);
+      const nextTarget = state.targets.find((t) => !t.hit && !t.blueprint.penaltyMs);
       expect(nextTarget).toBeDefined();
       state = stepGame(state, nextTarget!.position, 16, DEFAULT_WAVES);
       safetyFrames++;

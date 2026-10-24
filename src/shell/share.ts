@@ -104,7 +104,7 @@ export function renderResultCardToCanvas(
 
   ctx.fillStyle = '#00ffcc';
   ctx.font = 'bold 12px monospace';
-  ctx.fillText('AIM TRACE LOG (SQUARE)', mapX + 18, mapY - 12);
+  ctx.fillText('AIM TRACE LOG', mapX + 52, mapY - 12);
 
   if (data.fullTrace.length > 1) {
     ctx.strokeStyle = '#00ff66';

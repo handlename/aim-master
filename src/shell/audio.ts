@@ -46,6 +46,10 @@ export class RetroAudio {
       case 'TARGET_HIT':
         this.playTone(ctx, 960, 260, now, 0.09, 0.18);
         break;
+      case 'PENALTY_HIT':
+        this.playTone(ctx, 160, 110, now, 0.11, 0.22);
+        this.playTone(ctx, 120, 85, now + 0.11, 0.14, 0.22);
+        break;
       case 'WAVE_CLEAR':
         this.playTone(ctx, 660, 660, now, 0.06, 0.14);
         this.playTone(ctx, 990, 990, now + 0.06, 0.09, 0.14);
