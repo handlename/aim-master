@@ -37,9 +37,12 @@ describe('storage and share helpers', () => {
     expect(ts).toBe('2026-10-24 10:40:05');
 
     const text = buildShareText();
-    expect(text).toBe('AIM MASTER #AIMMASTER');
-    expect(buildXIntentUrl(text)).toBe(
-      'https://twitter.com/intent/tweet?text=AIM%20MASTER%20%23AIMMASTER'
+    expect(text).toBe(
+      'BOOM! NEW HIGH SCORE! 🎯🔥\nAIM MASTER #AIMMASTER\nhttps://handlename.github.io/aim-master/'
+    );
+    expect(buildXIntentUrl(text)).toContain('https://twitter.com/intent/tweet?text=');
+    expect(buildXIntentUrl(text)).toContain(
+      encodeURIComponent('https://handlename.github.io/aim-master/')
     );
   });
 

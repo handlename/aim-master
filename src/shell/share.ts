@@ -10,8 +10,10 @@ export interface ResultCardData {
   readonly fullTrace: readonly Point[];
 }
 
+export const PUBLIC_GAME_URL = 'https://handlename.github.io/aim-master/';
+
 export function buildShareText(): string {
-  return 'AIM MASTER #AIMMASTER';
+  return `BOOM! NEW HIGH SCORE! 🎯🔥\nAIM MASTER #AIMMASTER\n${PUBLIC_GAME_URL}`;
 }
 
 export function buildXIntentUrl(text: string): string {
