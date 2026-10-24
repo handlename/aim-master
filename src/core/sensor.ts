@@ -16,9 +16,17 @@ export interface OrientationSample {
   readonly gamma: number | null;
 }
 
+export interface AimOptions {
+  readonly sensitivity: number;
+  readonly invertX: boolean;
+  readonly invertY: boolean;
+}
+
 export interface SensorState {
   readonly crosshair: Point;
   readonly sensitivity: number;
+  readonly invertX: boolean;
+  readonly invertY: boolean;
   readonly lastOrientation: OrientationSample | null;
 }
 
@@ -35,13 +43,41 @@ export const PLAYFIELD_CENTER: Point = {
 };
 
 const MAX_DT_SEC = 0.05;
-const DEFAULT_SENSITIVITY = 6.0;
+export const DEFAULT_SENSITIVITY = 6.0;
+export const MIN_SENSITIVITY = 2.0;
+export const MAX_SENSITIVITY = 14.0;
 
-export function createInitialSensorState(sensitivity: number = DEFAULT_SENSITIVITY): SensorState {
+export function clampSensitivity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SENSITIVITY;
+  }
+  return Math.min(MAX_SENSITIVITY, Math.max(MIN_SENSITIVITY, Math.round(value * 2) / 2));
+}
+
+export function createInitialSensorState(
+  sensitivity: number = DEFAULT_SENSITIVITY,
+  invertX: boolean = false,
+  invertY: boolean = false
+): SensorState {
   return {
     crosshair: PLAYFIELD_CENTER,
-    sensitivity,
+    sensitivity: clampSensitivity(sensitivity),
+    invertX,
+    invertY,
     lastOrientation: null,
+  };
+}
+
+export function updateSensorOptions(
+  state: SensorState,
+  options: Partial<AimOptions>
+): SensorState {
+  return {
+    ...state,
+    sensitivity:
+      options.sensitivity !== undefined ? clampSensitivity(options.sensitivity) : state.sensitivity,
+    invertX: options.invertX !== undefined ? options.invertX : state.invertX,
+    invertY: options.invertY !== undefined ? options.invertY : state.invertY,
   };
 }
 
@@ -105,8 +141,10 @@ export function stepCrosshairFromMotion(
   const worldHorizRate = boostedHorizDegPerSec * cosRoll - rawVertDegPerSec * sinRoll;
   const worldVertRate = boostedHorizDegPerSec * sinRoll + rawVertDegPerSec * cosRoll;
 
-  const dx = worldHorizRate * dt * state.sensitivity;
-  const dy = worldVertRate * dt * state.sensitivity;
+  const dirX = state.invertX ? -1 : 1;
+  const dirY = state.invertY ? -1 : 1;
+  const dx = worldHorizRate * dt * state.sensitivity * dirX;
+  const dy = worldVertRate * dt * state.sensitivity * dirY;
 
   const nextCrosshair = clampPoint(
     {
@@ -192,8 +230,10 @@ export function stepCrosshairFromOrientation(
       ? shortestAngleDeltaDeg(sample.gamma, prev.gamma)
       : 0;
 
-  const dx = (-dAlpha - dGamma) * state.sensitivity;
-  const dy = -dBeta * state.sensitivity;
+  const dirX = state.invertX ? -1 : 1;
+  const dirY = state.invertY ? -1 : 1;
+  const dx = (-dAlpha - dGamma) * state.sensitivity * dirX;
+  const dy = -dBeta * state.sensitivity * dirY;
 
   const nextCrosshair = clampPoint(
     {

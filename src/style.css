@@ -57,8 +57,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 20px 16px 64px;
+  padding: 16px 14px 168px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .overlay-panel button,
@@ -68,10 +69,10 @@ body {
 }
 
 .result-panel {
-  justify-content: center;
+  justify-content: flex-start;
   background: rgba(5, 5, 15, 0.92);
-  padding: 16px;
-  gap: 12px;
+  padding: 14px 14px 160px;
+  gap: 8px;
 }
 
 .hidden {
@@ -80,14 +81,14 @@ body {
 
 .result-title {
   color: #ffcc00;
-  font-size: 20px;
+  font-size: 18px;
   letter-spacing: 1px;
   text-shadow: 2px 2px 0 #ff3333;
 }
 
 .result-card-preview {
   width: 100%;
-  max-width: 320px;
+  max-width: 240px;
   height: auto;
   border: 2px solid #ffffff;
   image-rendering: pixelated;
@@ -103,8 +104,8 @@ body {
 .arcade-btn {
   font-family: inherit;
   font-weight: bold;
-  font-size: 14px;
-  padding: 12px 16px;
+  font-size: 13px;
+  padding: 10px 12px;
   border: 3px solid #ffffff;
   cursor: pointer;
   text-decoration: none;
@@ -120,8 +121,8 @@ body {
 .primary-btn {
   background: #ff3333;
   color: #ffffff;
-  width: 85%;
-  font-size: 16px;
+  width: 90%;
+  font-size: 15px;
 }
 
 .share-btn {
@@ -137,13 +138,84 @@ body {
 }
 
 .hint-text {
-  margin-top: 10px;
-  font-size: 11px;
-  line-height: 1.4;
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.35;
   color: #cccccc;
   text-align: center;
-  background: rgba(0, 0, 0, 0.75);
-  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.78);
+  padding: 4px 6px;
+}
+
+.options-panel {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 48px;
+  z-index: 3;
+  background: rgba(10, 10, 28, 0.94);
+  border: 2px solid #00ffcc;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 3px 3px 0 #000000;
+}
+
+.options-header {
+  font-size: 11px;
+  font-weight: bold;
+  color: #ffcc00;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.options-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.options-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.options-val {
+  color: #00ff66;
+}
+
+.retro-slider {
+  width: 100%;
+  accent-color: #00ff66;
+  height: 18px;
+  cursor: pointer;
+}
+
+.options-toggles {
+  display: flex;
+  gap: 6px;
+}
+
+.toggle-btn {
+  flex: 1;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 6px 4px;
+  background: #1a1a36;
+  color: #aaaaaa;
+  border: 2px solid #666688;
+  cursor: pointer;
+}
+
+.toggle-btn[aria-pressed='true'] {
+  background: #004422;
+  color: #00ff66;
+  border-color: #00ff66;
 }
 
 .controls-bar {

@@ -14,7 +14,7 @@
       <div class="cabinet">
         <canvas id="game-canvas" width="240" height="400"></canvas>
 
-        <!-- Title Start Overlay Button -->
+        <!-- Title Start Overlay -->
         <div id="title-overlay" class="overlay-panel">
           <button id="start-btn" type="button" class="arcade-btn primary-btn">
             START GAME
@@ -49,6 +49,33 @@
             PLAY AGAIN
           </button>
         </div>
+
+        <!-- Shared Options Panel (Visible ONLY in TITLE & RESULT screens) -->
+        <section id="options-panel" class="options-panel" aria-label="Play Options">
+          <div class="options-header">OPTIONS</div>
+          <div class="options-row">
+            <label for="sensitivity-slider" class="options-label">
+              SENSITIVITY <span id="sensitivity-value" class="options-val">6.0</span>
+            </label>
+            <input
+              id="sensitivity-slider"
+              type="range"
+              min="2.0"
+              max="14.0"
+              step="0.5"
+              value="6.0"
+              class="retro-slider"
+            />
+          </div>
+          <div class="options-toggles">
+            <button id="invert-x-btn" type="button" class="toggle-btn" aria-pressed="false">
+              左右反転: OFF
+            </button>
+            <button id="invert-y-btn" type="button" class="toggle-btn" aria-pressed="false">
+              上下反転: OFF
+            </button>
+          </div>
+        </section>
       </div>
 
       <div class="controls-bar">

@@ -7,6 +7,7 @@ import {
   shouldApplyPointerFallback,
   stepCrosshairFromMotion,
   stepCrosshairFromOrientation,
+  updateSensorOptions,
 } from './sensor';
 
 describe('sensor core', () => {
@@ -172,5 +173,36 @@ describe('sensor core', () => {
     expect(shouldApplyPointerFallback(true, 'touch', 1)).toBe(false);
     expect(shouldApplyPointerFallback(false, 'touch', 1)).toBe(true);
     expect(shouldApplyPointerFallback(false, 'mouse', 0)).toBe(true);
+  });
+
+  it('adjusts sensitivity and inverts X and Y axes when configured via updateSensorOptions', () => {
+    const base = createInitialSensorState(6.0);
+    const sample = {
+      alphaRate: 20, // normally moves up (y < center)
+      betaRate: -20, // normally moves right (x > center)
+      gammaRate: 0,
+      gx: 0,
+      gy: -9.8,
+      gz: 0,
+      dtSec: 0.02,
+    };
+
+    const normalMoved = stepCrosshairFromMotion(base, sample);
+    expect(normalMoved.crosshair.x).toBeGreaterThan(PLAYFIELD_CENTER.x);
+    expect(normalMoved.crosshair.y).toBeLessThan(PLAYFIELD_CENTER.y);
+
+    // Double sensitivity and invert both X and Y
+    const customState = updateSensorOptions(base, {
+      sensitivity: 12.0,
+      invertX: true,
+      invertY: true,
+    });
+    const invertedMoved = stepCrosshairFromMotion(customState, sample);
+    expect(invertedMoved.crosshair.x).toBeLessThan(PLAYFIELD_CENTER.x);
+    expect(invertedMoved.crosshair.y).toBeGreaterThan(PLAYFIELD_CENTER.y);
+
+    const normalDx = Math.abs(normalMoved.crosshair.x - PLAYFIELD_CENTER.x);
+    const invertedDx = Math.abs(invertedMoved.crosshair.x - PLAYFIELD_CENTER.x);
+    expect(invertedDx).toBeCloseTo(normalDx * 2, 2);
   });
 });

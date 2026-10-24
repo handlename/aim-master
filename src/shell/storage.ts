@@ -1,4 +1,62 @@
+import { AimOptions, DEFAULT_SENSITIVITY, clampSensitivity } from '../core/sensor';
+
 export const BEST_TIME_STORAGE_KEY = 'aim_master_best_time_ms';
+export const OPTIONS_STORAGE_KEY = 'aim_master_options';
+
+export function loadAimOptions(
+  storage: Pick<Storage, 'getItem'> | undefined = typeof window !== 'undefined'
+    ? window.localStorage
+    : undefined
+): AimOptions {
+  const defaultOptions: AimOptions = {
+    sensitivity: DEFAULT_SENSITIVITY,
+    invertX: false,
+    invertY: false,
+  };
+  if (!storage) {
+    return defaultOptions;
+  }
+  try {
+    const raw = storage.getItem(OPTIONS_STORAGE_KEY);
+    if (!raw) {
+      return defaultOptions;
+    }
+    const parsed = JSON.parse(raw) as Partial<AimOptions>;
+    return {
+      sensitivity:
+        typeof parsed.sensitivity === 'number'
+          ? clampSensitivity(parsed.sensitivity)
+          : DEFAULT_SENSITIVITY,
+      invertX: Boolean(parsed.invertX),
+      invertY: Boolean(parsed.invertY),
+    };
+  } catch {
+    return defaultOptions;
+  }
+}
+
+export function saveAimOptions(
+  options: AimOptions,
+  storage: Pick<Storage, 'setItem'> | undefined = typeof window !== 'undefined'
+    ? window.localStorage
+    : undefined
+): void {
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(
+      OPTIONS_STORAGE_KEY,
+      JSON.stringify({
+        sensitivity: clampSensitivity(options.sensitivity),
+        invertX: Boolean(options.invertX),
+        invertY: Boolean(options.invertY),
+      })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export function loadBestTime(
   storage: Pick<Storage, 'getItem'> | undefined = typeof window !== 'undefined'

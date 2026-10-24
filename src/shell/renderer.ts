@@ -138,26 +138,26 @@ export function renderGame(
 
   // Phase overlays
   if (state.phase === 'TITLE') {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.fillRect(16, 72, LOGICAL_WIDTH - 32, 190);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.76)';
+    ctx.fillRect(16, 52, LOGICAL_WIDTH - 32, 134);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(16, 72, LOGICAL_WIDTH - 32, 190);
+    ctx.strokeRect(16, 52, LOGICAL_WIDTH - 32, 134);
 
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 20px monospace';
-    ctx.fillText('AIM MASTER', 56, 106);
+    ctx.fillText('AIM MASTER', 56, 80);
 
     ctx.fillStyle = '#00ffcc';
     ctx.font = 'bold 10px monospace';
-    ctx.fillText('HOLD PHONE VERTICALLY', 48, 136);
-    ctx.fillText('SWEEP CROSSHAIR TO HIT!', 42, 154);
+    ctx.fillText('HOLD PHONE VERTICALLY', 48, 108);
+    ctx.fillText('SWEEP CROSSHAIR TO HIT!', 42, 126);
 
     const bestLabel =
-      state.bestTimeMs !== null ? `BEST: ${formatTimeSeconds(state.bestTimeMs)}s` : 'BEST: --.--s';
+      state.bestTimeMs !== null ? `BEST: ${formatTimeSeconds(state.bestTimeMs)}s` : 'BEST: --.---s';
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(bestLabel, 72, 188);
+    ctx.fillText(bestLabel, 66, 158);
   } else if (state.phase === 'COUNTDOWN') {
     const sec = Math.ceil(state.countdownRemainingMs / 600);
     const label = sec >= 1 ? `READY... ${sec}` : 'GO!';

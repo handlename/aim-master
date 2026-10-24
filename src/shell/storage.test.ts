@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatTimeSeconds, loadBestTime, saveBestTime } from './storage';
+import {
+  formatTimeSeconds,
+  loadAimOptions,
+  loadBestTime,
+  saveAimOptions,
+  saveBestTime,
+} from './storage';
 import { buildShareText, buildXIntentUrl } from './share';
 
 describe('storage and share helpers', () => {
@@ -31,5 +37,18 @@ describe('storage and share helpers', () => {
     expect(text).toContain('04.823s');
     expect(text).toContain('NEW RECORD');
     expect(buildXIntentUrl(text)).toContain('https://twitter.com/intent/tweet?text=');
+  });
+
+  it('saves and loads aim options (sensitivity, invertX, invertY) with fallback for corrupt data', () => {
+    let stored = '';
+    saveAimOptions(
+      { sensitivity: 8.5, invertX: true, invertY: false },
+      { setItem: (_k, v) => { stored = v; } }
+    );
+    const loaded = loadAimOptions({ getItem: () => stored });
+    expect(loaded).toEqual({ sensitivity: 8.5, invertX: true, invertY: false });
+
+    const fallback = loadAimOptions({ getItem: () => '{bad json' });
+    expect(fallback).toEqual({ sensitivity: 6.0, invertX: false, invertY: false });
   });
 });

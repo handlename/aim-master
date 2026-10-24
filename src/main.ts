@@ -9,17 +9,29 @@ import {
   shouldApplyPointerFallback,
   stepCrosshairFromMotion,
   stepCrosshairFromOrientation,
+  updateSensorOptions,
 } from './core/sensor';
 import { DEFAULT_WAVES } from './core/waves';
 import { RetroAudio } from './shell/audio';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, renderGame } from './shell/renderer';
 import { ResultCardData, generateResultCardBlob, shareResult } from './shell/share';
-import { formatTimeSeconds, loadBestTime, saveBestTime } from './shell/storage';
+import {
+  formatTimeSeconds,
+  loadAimOptions,
+  loadBestTime,
+  saveAimOptions,
+  saveBestTime,
+} from './shell/storage';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const titleOverlay = document.getElementById('title-overlay') as HTMLDivElement;
 const resultOverlay = document.getElementById('result-overlay') as HTMLDivElement;
+const optionsPanel = document.getElementById('options-panel') as HTMLElement;
+const sensitivitySlider = document.getElementById('sensitivity-slider') as HTMLInputElement;
+const sensitivityValue = document.getElementById('sensitivity-value') as HTMLSpanElement;
+const invertXBtn = document.getElementById('invert-x-btn') as HTMLButtonElement;
+const invertYBtn = document.getElementById('invert-y-btn') as HTMLButtonElement;
 const resultHeading = document.getElementById('result-heading') as HTMLHeadingElement;
 const resultCardImg = document.getElementById('result-card-img') as HTMLImageElement;
 const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
@@ -29,7 +41,12 @@ const downloadLink = document.getElementById('download-link') as HTMLAnchorEleme
 const resetCenterBtn = document.getElementById('reset-center-btn') as HTMLButtonElement;
 
 const audio = new RetroAudio();
-let sensorState = createInitialSensorState();
+const initialOptions = loadAimOptions();
+let sensorState = createInitialSensorState(
+  initialOptions.sensitivity,
+  initialOptions.invertX,
+  initialOptions.invertY
+);
 let gameState = createInitialGameState(loadBestTime());
 
 let hasMotionEvents = false;
@@ -37,6 +54,63 @@ let isStartingRun = false;
 let lastMotionTimestampMs: number | null = null;
 let latestResultBlob: Blob | null = null;
 let latestResultData: ResultCardData | null = null;
+
+function isOptionsEditable(): boolean {
+  return gameState.phase === 'TITLE' || gameState.phase === 'RESULT';
+}
+
+function syncOptionsUI(): void {
+  sensitivitySlider.value = sensorState.sensitivity.toFixed(1);
+  sensitivityValue.textContent = sensorState.sensitivity.toFixed(1);
+
+  invertXBtn.setAttribute('aria-pressed', String(sensorState.invertX));
+  invertXBtn.textContent = `左右反転: ${sensorState.invertX ? 'ON' : 'OFF'}`;
+
+  invertYBtn.setAttribute('aria-pressed', String(sensorState.invertY));
+  invertYBtn.textContent = `上下反転: ${sensorState.invertY ? 'ON' : 'OFF'}`;
+}
+
+syncOptionsUI();
+
+sensitivitySlider.addEventListener('input', () => {
+  if (!isOptionsEditable()) {
+    return;
+  }
+  const nextSens = Number(sensitivitySlider.value);
+  sensorState = updateSensorOptions(sensorState, { sensitivity: nextSens });
+  saveAimOptions({
+    sensitivity: sensorState.sensitivity,
+    invertX: sensorState.invertX,
+    invertY: sensorState.invertY,
+  });
+  syncOptionsUI();
+});
+
+invertXBtn.addEventListener('click', () => {
+  if (!isOptionsEditable()) {
+    return;
+  }
+  sensorState = updateSensorOptions(sensorState, { invertX: !sensorState.invertX });
+  saveAimOptions({
+    sensitivity: sensorState.sensitivity,
+    invertX: sensorState.invertX,
+    invertY: sensorState.invertY,
+  });
+  syncOptionsUI();
+});
+
+invertYBtn.addEventListener('click', () => {
+  if (!isOptionsEditable()) {
+    return;
+  }
+  sensorState = updateSensorOptions(sensorState, { invertY: !sensorState.invertY });
+  saveAimOptions({
+    sensitivity: sensorState.sensitivity,
+    invertX: sensorState.invertX,
+    invertY: sensorState.invertY,
+  });
+  syncOptionsUI();
+});
 
 async function requestSensorPermissionsIfNeeded(): Promise<void> {
   const motionCtor =
@@ -78,7 +152,6 @@ window.addEventListener('devicemotion', (event: DeviceMotionEvent) => {
 });
 
 window.addEventListener('deviceorientation', (event: DeviceOrientationEvent) => {
-  // Only use orientation Euler deltas if rotationRate from devicemotion is unavailable
   if (hasMotionEvents) {
     return;
   }
@@ -89,7 +162,6 @@ window.addEventListener('deviceorientation', (event: DeviceOrientationEvent) => 
   });
 });
 
-// Pointer / mouse fallback for desktop testing and bottom HUD center reset tap
 function updateCrosshairFromPointer(clientX: number, clientY: number): void {
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) {
@@ -148,6 +220,7 @@ async function beginGameRun(): Promise<void> {
     }
     titleOverlay.classList.add('hidden');
     resultOverlay.classList.add('hidden');
+    optionsPanel.classList.add('hidden');
   } finally {
     isStartingRun = false;
     startBtn.disabled = false;
@@ -193,6 +266,7 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
     // Ignore image generation failure in non-canvas environments
   }
   resultOverlay.classList.remove('hidden');
+  optionsPanel.classList.remove('hidden');
 }
 
 let lastFrameTimeMs = performance.now();
