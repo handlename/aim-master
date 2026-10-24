@@ -126,6 +126,48 @@ describe('sensor core', () => {
     expect(orientCalled).toBe(false);
   });
 
+  it('maintains full vertical and horizontal responsiveness when the phone is tilted upward (pitched into Z with slight X roll)', () => {
+    const s0 = createInitialSensorState(6.0);
+    // Upright reference movement
+    const uprightVert = stepCrosshairFromMotion(s0, {
+      alphaRate: 25,
+      betaRate: 0,
+      gammaRate: 0,
+      gx: 0.8,
+      gy: -9.7,
+      gz: 0,
+      dtSec: 0.02,
+    });
+
+    // Phone tilted 55 deg upward (gy = -5.6, gz = 8.0) with the same slight hand roll gx = 0.8
+    // Vertical movement must not shrink, and actually gains tangent ray projection boost
+    const pitchedVert = stepCrosshairFromMotion(s0, {
+      alphaRate: 25,
+      betaRate: 0,
+      gammaRate: 0,
+      gx: 0.8,
+      gy: -5.6,
+      gz: 8.0,
+      dtSec: 0.02,
+    });
+    const uprightDy = PLAYFIELD_CENTER.y - uprightVert.crosshair.y;
+    const pitchedDy = PLAYFIELD_CENTER.y - pitchedVert.crosshair.y;
+    expect(pitchedDy).toBeGreaterThanOrEqual(uprightDy);
+
+    // Horizontal pan while tilted forward 45 deg (gy = -6.9, gz = 6.9):
+    // World yaw right has betaRate < 0 and gammaRate > 0; must not cancel out!
+    const pitchedHoriz = stepCrosshairFromMotion(s0, {
+      alphaRate: 0,
+      betaRate: -21.2,
+      gammaRate: 21.2,
+      gx: 0,
+      gy: -6.9,
+      gz: 6.9,
+      dtSec: 0.02,
+    });
+    expect(pitchedHoriz.crosshair.x - PLAYFIELD_CENTER.x).toBeGreaterThan(3.0);
+  });
+
   it('ignores touch pointer fallback when motion sensors are active to prevent accidental palm jumps', () => {
     expect(shouldApplyPointerFallback(true, 'touch', 1)).toBe(false);
     expect(shouldApplyPointerFallback(false, 'touch', 1)).toBe(true);

@@ -35,7 +35,7 @@ export const PLAYFIELD_CENTER: Point = {
 };
 
 const MAX_DT_SEC = 0.05;
-const DEFAULT_SENSITIVITY = 4.5;
+const DEFAULT_SENSITIVITY = 6.0;
 
 export function createInitialSensorState(sensitivity: number = DEFAULT_SENSITIVITY): SensorState {
   return {
@@ -69,27 +69,41 @@ export function stepCrosshairFromMotion(
 
   // In W3C / WebKit DeviceMotionEvent.rotationRate:
   // - alphaRate is rotation around the device's horizontal X-axis (pitching top of phone up/down -> vertical screen Y).
-  // - betaRate is rotation around the device's vertical Y-axis (panning phone left/right when held vertically -> horizontal screen X).
-  // - gammaRate is rotation around the device's perpendicular Z-axis.
-  const rawHorizDegPerSec = -(sample.betaRate ?? 0) - (sample.gammaRate ?? 0);
-  const rawVertDegPerSec = -(sample.alphaRate ?? 0);
+  // - betaRate is rotation around the device's vertical Y-axis (panning phone left/right when held vertically).
+  // - gammaRate is rotation around the device's perpendicular Z-axis (yaw component when phone is pitched up/down).
+  const alphaRate = sample.alphaRate ?? 0;
+  const betaRate = sample.betaRate ?? 0;
+  const gammaRate = sample.gammaRate ?? 0;
 
-  // Use gravity vector (gx, gy) on the screen plane to compensate if the phone is held slightly tilted (roll).
-  // In upright portrait posture, gravity points along -Y (gx ≈ 0, gy ≈ -9.8).
   const gx = sample.gx ?? 0;
   const gy = sample.gy ?? 0;
-  const gMag = Math.hypot(gx, gy);
+  const gz = sample.gz ?? 0;
+  const gMag3D = Math.hypot(gx, gy, gz);
+  const gyzMag = Math.hypot(gy, gz);
 
+  // Project horizontal world yaw onto the phone's YZ gravity plane so betaRate and gammaRate
+  // always combine constructively regardless of whether the phone is tilted forward or backward.
+  const rawHorizDegPerSec =
+    gyzMag > 0.1 ? (gy * betaRate + gz * gammaRate) / gyzMag : -betaRate - gammaRate;
+
+  // Compensate for light-gun tangent ray projection (d(tan θ)/dθ = 1 / cos^2 θ) when pitched up/down,
+  // preventing perceived loss of vertical/horizontal movement when aiming near the top of the screen.
+  const cosPitch = gMag3D > 0.1 ? Math.abs(gy) / gMag3D : 1;
+  const pitchRayGain = 1 / Math.max(0.55, cosPitch * cosPitch);
+
+  const rawVertDegPerSec = -alphaRate * pitchRayGain;
+  const boostedHorizDegPerSec = rawHorizDegPerSec * Math.sqrt(pitchRayGain);
+
+  // Compute screen roll using 3D gravity magnitude so pitching into Z never shrinks cosRoll.
   let cosRoll = 1;
   let sinRoll = 0;
-  if (gMag > 0.1) {
-    // Upright unit down vector is (0, -1). Actual down vector is (gx / gMag, gy / gMag).
-    cosRoll = -gy / gMag;
-    sinRoll = gx / gMag;
+  if (gMag3D > 0.1) {
+    sinRoll = Math.min(0.98, Math.max(-0.98, gx / gMag3D));
+    cosRoll = Math.sqrt(1 - sinRoll * sinRoll) * (gy <= 0 ? 1 : -1);
   }
 
-  const worldHorizRate = rawHorizDegPerSec * cosRoll - rawVertDegPerSec * sinRoll;
-  const worldVertRate = rawHorizDegPerSec * sinRoll + rawVertDegPerSec * cosRoll;
+  const worldHorizRate = boostedHorizDegPerSec * cosRoll - rawVertDegPerSec * sinRoll;
+  const worldVertRate = boostedHorizDegPerSec * sinRoll + rawVertDegPerSec * cosRoll;
 
   const dx = worldHorizRate * dt * state.sensitivity;
   const dy = worldVertRate * dt * state.sensitivity;
