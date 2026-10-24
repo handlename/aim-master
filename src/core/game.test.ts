@@ -78,8 +78,8 @@ describe('waves and game state machine', () => {
     expect(state.audioEvents).toContain('GAME_CLEAR');
   });
 
-  it('defines 5 default waves within the 240x400 playfield and completes a full 5-wave sensor simulation', () => {
-    expect(DEFAULT_WAVES.length).toBe(5);
+  it('defines 10 default waves within the 240x400 playfield and completes a full 10-wave sensor simulation', () => {
+    expect(DEFAULT_WAVES.length).toBe(10);
     for (const wave of DEFAULT_WAVES) {
       expect(wave.targets.length).toBeGreaterThanOrEqual(1);
     }

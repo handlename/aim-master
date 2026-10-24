@@ -17,17 +17,18 @@ describe('storage and share helpers', () => {
     expect(saved).toBe('4824');
   });
 
-  it('formats milliseconds as MM.SS 2-decimal seconds string', () => {
-    expect(formatTimeSeconds(4823)).toBe('04.82');
-    expect(formatTimeSeconds(12345)).toBe('12.35');
+  it('formats milliseconds as SS.mmm 3-decimal seconds string (1/1000s precision)', () => {
+    expect(formatTimeSeconds(4823)).toBe('04.823');
+    expect(formatTimeSeconds(12345)).toBe('12.345');
+    expect(formatTimeSeconds(50)).toBe('00.050');
   });
 
   it('builds share text and X intent URL', () => {
     const text = buildShareText(
-      { clearTimeMs: 4820, bestTimeMs: 4820, isNewRecord: true, fullTrace: [] },
+      { clearTimeMs: 4823, bestTimeMs: 4823, isNewRecord: true, fullTrace: [] },
       'https://example.com/aim-master'
     );
-    expect(text).toContain('04.82s');
+    expect(text).toContain('04.823s');
     expect(text).toContain('NEW RECORD');
     expect(buildXIntentUrl(text)).toContain('https://twitter.com/intent/tweet?text=');
   });

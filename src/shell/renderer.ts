@@ -76,26 +76,26 @@ export function renderGame(
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 34, LOGICAL_WIDTH, 2);
 
-  ctx.font = 'bold 11px monospace';
+  ctx.font = 'bold 10px monospace';
   ctx.textBaseline = 'middle';
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('TIME', 8, 18);
+  ctx.fillText('TIME', 6, 18);
   ctx.fillStyle = '#ffcc00';
-  ctx.fillText(formatTimeSeconds(state.elapsedMs), 40, 18);
+  ctx.fillText(formatTimeSeconds(state.elapsedMs), 34, 18);
 
   const remainingTargets = state.targets.filter((t) => !t.hit).length;
   const totalWaveTargets = state.targets.length;
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('WV', 102, 18);
+  ctx.fillText('WV', 98, 18);
   ctx.fillStyle = '#00ffcc';
-  ctx.fillText(`${Math.min(totalWaves, state.waveIndex + 1)}/${totalWaves}`, 120, 18);
+  ctx.fillText(`${Math.min(totalWaves, state.waveIndex + 1)}/${totalWaves}`, 114, 18);
 
   ctx.fillStyle = '#ffffff';
   ctx.fillText('TGT', 164, 18);
   ctx.fillStyle = '#00ffcc';
-  ctx.fillText(`${remainingTargets}/${totalWaveTargets}`, 190, 18);
+  ctx.fillText(`${remainingTargets}/${totalWaveTargets}`, 188, 18);
 
   // Active targets
   for (const target of state.targets) {

@@ -59,7 +59,7 @@ export function renderResultCardToCanvas(
   ctx.fillText('CLEAR TIME', 44, 125);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 54px monospace';
+  ctx.font = 'bold 46px monospace';
   ctx.fillText(clearStr, 44, 178);
 
   if (data.isNewRecord) {
@@ -88,7 +88,7 @@ export function renderResultCardToCanvas(
 
   ctx.fillStyle = '#00ff66';
   ctx.font = 'bold 15px monospace';
-  ctx.fillText('ALL 5 WAVES CLEARED', 140, 330);
+  ctx.fillText('ALL 10 WAVES CLEARED', 140, 330);
 
   // Right side: Aim Trajectory Mini-Map (playfield 240x320 scaled by 0.75 -> 180x240)
   const mapX = 376;

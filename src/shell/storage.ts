@@ -42,6 +42,6 @@ export function saveBestTime(
 export function formatTimeSeconds(timeMs: number): string {
   const safeMs = Math.max(0, Number.isFinite(timeMs) ? timeMs : 0);
   const seconds = safeMs / 1000;
-  const formatted = seconds.toFixed(2);
+  const formatted = seconds.toFixed(3);
   return seconds < 10 ? `0${formatted}` : formatted;
 }
