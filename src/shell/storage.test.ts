@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clearBestTime,
   formatTimeSeconds,
   formatTimestamp,
   loadAimOptions,
   loadBestTime,
   saveAimOptions,
   saveBestTime,
+  shouldResetBestFromSearch,
 } from './storage';
 import { buildShareText, buildXIntentUrl } from './share';
 
@@ -60,5 +62,16 @@ describe('storage and share helpers', () => {
 
     const fallback = loadAimOptions({ getItem: () => '{bad json' });
     expect(fallback).toEqual({ sensitivity: 6.0, invertX: false, invertY: false });
+  });
+
+  it('detects ?reset=1 query parameter and clears stored best time', () => {
+    expect(shouldResetBestFromSearch('?reset=1')).toBe(true);
+    expect(shouldResetBestFromSearch('?foo=bar&reset=1')).toBe(true);
+    expect(shouldResetBestFromSearch('?reset=0')).toBe(false);
+    expect(shouldResetBestFromSearch('')).toBe(false);
+
+    let removedKey = '';
+    clearBestTime({ removeItem: (k) => { removedKey = k; } });
+    expect(removedKey).toBe('aim_master_best_time_ms');
   });
 });

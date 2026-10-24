@@ -97,6 +97,30 @@ export function saveBestTime(
   }
 }
 
+export function clearBestTime(
+  storage: Pick<Storage, 'removeItem'> | undefined = typeof window !== 'undefined'
+    ? window.localStorage
+    : undefined
+): void {
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.removeItem(BEST_TIME_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function shouldResetBestFromSearch(search: string): boolean {
+  try {
+    const params = new URLSearchParams(search);
+    return params.get('reset') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function formatTimeSeconds(timeMs: number): string {
   const safeMs = Math.max(0, Number.isFinite(timeMs) ? timeMs : 0);
   const seconds = safeMs / 1000;

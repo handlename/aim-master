@@ -16,12 +16,14 @@ import { RetroAudio } from './shell/audio';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, renderGame } from './shell/renderer';
 import { ResultCardData, generateResultCardBlob, shareResult } from './shell/share';
 import {
+  clearBestTime,
   formatTimeSeconds,
   formatTimestamp,
   loadAimOptions,
   loadBestTime,
   saveAimOptions,
   saveBestTime,
+  shouldResetBestFromSearch,
 } from './shell/storage';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -42,6 +44,12 @@ const shareBtn = document.getElementById('share-btn') as HTMLButtonElement;
 const resetCenterBtn = document.getElementById('reset-center-btn') as HTMLButtonElement;
 
 const audio = new RetroAudio();
+if (shouldResetBestFromSearch(window.location.search)) {
+  clearBestTime();
+  const cleanUrl = new URL(window.location.href);
+  cleanUrl.searchParams.delete('reset');
+  window.history.replaceState({}, '', cleanUrl.toString());
+}
 const initialOptions = loadAimOptions();
 let sensorState = createInitialSensorState(
   initialOptions.sensitivity,
