@@ -105,6 +105,7 @@ describe('waves and game state machine', () => {
     state = stepGame(state, { x: 180, y: 220 }, 20, wavesWithPenalty);
     expect(state.phase).toBe('PLAYING'); // Wave not cleared yet because normal-1 is unhit
     expect(state.elapsedMs).toBe(1020); // 20ms frame + 1000ms penalty!
+    expect(state.penaltyHits).toBe(1);
     expect(state.audioEvents).toContain('PENALTY_HIT');
 
     // Now sweep across the normal target at (60, 152) -> clears wave immediately without needing penalty target
@@ -112,6 +113,7 @@ describe('waves and game state machine', () => {
     state = stepGame(state, { x: 60, y: 220 }, 20, wavesWithPenalty);
     expect(state.phase).toBe('RESULT');
     expect(state.elapsedMs).toBe(1060);
+    expect(state.penaltyHits).toBe(1);
   });
 
   it('defines 10 default waves with penalty targets in later waves and completes a full 10-wave sensor simulation', () => {

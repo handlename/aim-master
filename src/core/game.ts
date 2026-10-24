@@ -41,6 +41,7 @@ export interface GameState {
   readonly waveIndex: number;
   readonly waveElapsedMs: number;
   readonly elapsedMs: number;
+  readonly penaltyHits: number;
   readonly bestTimeMs: number | null;
   readonly isNewRecord: boolean;
   readonly crosshair: Point;
@@ -83,6 +84,7 @@ export function createInitialGameState(bestTimeMs: number | null): GameState {
     waveIndex: 0,
     waveElapsedMs: 0,
     elapsedMs: 0,
+    penaltyHits: 0,
     bestTimeMs,
     isNewRecord: false,
     crosshair: PLAYFIELD_CENTER,
@@ -105,6 +107,7 @@ export function startCountdown(
     waveIndex: 0,
     waveElapsedMs: 0,
     elapsedMs: 0,
+    penaltyHits: 0,
     isNewRecord: false,
     crosshair: initialCrosshair,
     targets: [],
@@ -234,6 +237,8 @@ export function stepGame(
       })),
     ];
 
+    const initialPenaltyHits = newlyHitPenaltyPositions.length;
+
     if (areAllNormalTargetsHit(updatedTargets) && waves.length > 1) {
       audioEvents.push('WAVE_CLEAR');
       return {
@@ -243,6 +248,7 @@ export function stepGame(
         waveIndex: 1,
         waveElapsedMs: 0,
         elapsedMs: addedPenaltyMs,
+        penaltyHits: initialPenaltyHits,
         crosshair: nextCrosshair,
         targets: spawnWaveTargets(waves[1]),
         hitEffects,
@@ -259,6 +265,7 @@ export function stepGame(
       waveIndex: 0,
       waveElapsedMs: 0,
       elapsedMs: addedPenaltyMs,
+      penaltyHits: initialPenaltyHits,
       crosshair: nextCrosshair,
       targets: updatedTargets,
       hitEffects,
@@ -281,6 +288,7 @@ export function stepGame(
   } = evaluateSweptHits(state.targets, state.crosshair, nextCrosshair, waveElapsedSec);
 
   const nextElapsedMs = state.elapsedMs + clampedDt + addedPenaltyMs;
+  const nextPenaltyHits = state.penaltyHits + newlyHitPenaltyPositions.length;
 
   const audioEvents: GameAudioEvent[] = [];
   if (newlyHitNormalPositions.length > 0) {
@@ -317,6 +325,7 @@ export function stepGame(
     return {
       ...state,
       elapsedMs: nextElapsedMs,
+      penaltyHits: nextPenaltyHits,
       waveElapsedMs: nextWaveElapsedMs,
       crosshair: nextCrosshair,
       targets: updatedTargets,
@@ -335,6 +344,7 @@ export function stepGame(
       waveIndex: nextWaveIndex,
       waveElapsedMs: 0,
       elapsedMs: nextElapsedMs,
+      penaltyHits: nextPenaltyHits,
       crosshair: nextCrosshair,
       targets: spawnWaveTargets(waves[nextWaveIndex]),
       hitEffects,
@@ -353,6 +363,7 @@ export function stepGame(
     ...state,
     phase: 'RESULT',
     elapsedMs: nextElapsedMs,
+    penaltyHits: nextPenaltyHits,
     waveElapsedMs: nextWaveElapsedMs,
     bestTimeMs: nextBestTimeMs,
     isNewRecord,

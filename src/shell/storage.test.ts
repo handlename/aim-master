@@ -36,19 +36,11 @@ describe('storage and share helpers', () => {
     const ts = formatTimestamp(new Date(2026, 9, 24, 10, 40, 5));
     expect(ts).toBe('2026-10-24 10:40:05');
 
-    const text = buildShareText(
-      {
-        clearTimeMs: 4823,
-        bestTimeMs: 4823,
-        isNewRecord: true,
-        clearedAt: ts,
-        fullTrace: [],
-      },
-      'https://example.com/aim-master'
+    const text = buildShareText();
+    expect(text).toBe('AIM MASTER #AIMMASTER');
+    expect(buildXIntentUrl(text)).toBe(
+      'https://twitter.com/intent/tweet?text=AIM%20MASTER%20%23AIMMASTER'
     );
-    expect(text).toContain('04.823s');
-    expect(text).toContain('NEW RECORD');
-    expect(buildXIntentUrl(text)).toContain('https://twitter.com/intent/tweet?text=');
   });
 
   it('saves and loads aim options (sensitivity, invertX, invertY) with fallback for corrupt data', () => {

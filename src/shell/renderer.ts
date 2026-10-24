@@ -145,22 +145,20 @@ function drawTarget(ctx: CanvasRenderingContext2D, target: ActiveTarget): void {
   ctx.fill();
 
   if (isPenaltyTarget(target.blueprint)) {
-    // Hazard / Penalty target: Purple-Yellow outer ring, dark core, and bold 'X' mark
-    const penaltyRings = [
-      { radius: r, color: '#ffcc00' },
-      { radius: Math.max(2, Math.round(r * 0.78)), color: '#660099' },
-      { radius: Math.max(2, Math.round(r * 0.52)), color: '#1a002c' },
-    ];
-    for (const ring of penaltyRings) {
-      ctx.fillStyle = ring.color;
-      ctx.beginPath();
-      ctx.arc(x, y, ring.radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Obstacle / Penalty target: Blue circle background with white '✗' mark
+    ctx.fillStyle = '#0033aa';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Draw bold 'X' across the penalty target
+    ctx.fillStyle = '#0066ff';
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(2, r - 2), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw bold white '✗' across the blue target
     const span = Math.max(4, Math.round(r * 0.45));
-    ctx.strokeStyle = '#ff3366';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(x - span, y - span);
@@ -299,10 +297,10 @@ export function renderGame(
     const ex = Math.round(effect.position.x);
     const ey = Math.round(effect.position.y);
     if (effect.kind === 'penalty') {
-      ctx.fillStyle = '#ff3366';
+      ctx.fillStyle = '#0066ff';
       ctx.fillRect(ex - 10, ey - 2, 20, 4);
       ctx.fillRect(ex - 2, ey - 10, 4, 20);
-      ctx.fillStyle = '#ffcc00';
+      ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px monospace';
       ctx.fillText('+1.0s!', ex - 18, ey - 14);
     } else {

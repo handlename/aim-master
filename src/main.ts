@@ -73,10 +73,10 @@ function syncOptionsUI(): void {
   sensitivityValue.textContent = sensorState.sensitivity.toFixed(1);
 
   invertXBtn.setAttribute('aria-pressed', String(sensorState.invertX));
-  invertXBtn.textContent = `左右反転: ${sensorState.invertX ? 'ON' : 'OFF'}`;
+  invertXBtn.textContent = `REVERSE X: ${sensorState.invertX ? 'ON' : 'OFF'}`;
 
   invertYBtn.setAttribute('aria-pressed', String(sensorState.invertY));
-  invertYBtn.textContent = `上下反転: ${sensorState.invertY ? 'ON' : 'OFF'}`;
+  invertYBtn.textContent = `REVERSE Y: ${sensorState.invertY ? 'ON' : 'OFF'}`;
 }
 
 syncOptionsUI();
@@ -250,6 +250,7 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
     clearTimeMs: state.elapsedMs,
     bestTimeMs: state.bestTimeMs ?? state.elapsedMs,
     isNewRecord: state.isNewRecord,
+    penaltyHits: state.penaltyHits,
     clearedAt,
     fullTrace: state.fullTrace,
   };
@@ -258,7 +259,7 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
     ? `★ NEW RECORD! ${formatTimeSeconds(state.elapsedMs)}s ★`
     : `CLEAR! ${formatTimeSeconds(state.elapsedMs)}s`;
   resultHeading.classList.toggle('new-record', state.isNewRecord);
-  resultTimestamp.textContent = clearedAt;
+  resultTimestamp.textContent = `${clearedAt} | PENALTY: ${state.penaltyHits}`;
 
   try {
     const { blob, dataUrl } = await generateResultCardBlob(data);

@@ -5,14 +5,13 @@ export interface ResultCardData {
   readonly clearTimeMs: number;
   readonly bestTimeMs: number;
   readonly isNewRecord: boolean;
+  readonly penaltyHits: number;
   readonly clearedAt: string;
   readonly fullTrace: readonly Point[];
 }
 
-export function buildShareText(data: ResultCardData, pageUrl: string): string {
-  const timeStr = `${formatTimeSeconds(data.clearTimeMs)}s`;
-  const badge = data.isNewRecord ? ' [NEW RECORD!]' : '';
-  return `🎯 AIM MASTER CLEAR! TIME: ${timeStr}${badge} (${data.clearedAt})\n#AimMaster\n${pageUrl}`.trim();
+export function buildShareText(): string {
+  return 'AIM MASTER #AIMMASTER';
 }
 
 export function buildXIntentUrl(text: string): string {
@@ -65,15 +64,19 @@ export function renderResultCardToCanvas(
 
   if (data.isNewRecord) {
     ctx.fillStyle = '#ff3333';
-    ctx.fillRect(44, 204, 168, 30);
+    ctx.fillRect(44, 200, 168, 28);
     ctx.fillStyle = '#ffff00';
     ctx.font = 'bold 18px monospace';
-    ctx.fillText('★ NEW RECORD! ★', 52, 220);
+    ctx.fillText('★ NEW RECORD! ★', 52, 215);
   }
 
   ctx.fillStyle = '#aaaaaa';
   ctx.font = 'bold 16px monospace';
-  ctx.fillText(`BEST TIME: ${bestStr}`, 44, 266);
+  ctx.fillText(`BEST TIME: ${bestStr}`, 44, 252);
+
+  ctx.fillStyle = data.penaltyHits > 0 ? '#66b2ff' : '#aaaaaa';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(`PENALTY HITS: ${data.penaltyHits}`, 44, 280);
 
   // Bullseye emblem
   const bx = 84;
@@ -150,11 +153,10 @@ export async function generateResultCardBlob(
 }
 
 export async function shareResult(
-  data: ResultCardData,
-  blob: Blob,
-  pageUrl: string = typeof window !== 'undefined' ? window.location.href : ''
+  _data: ResultCardData,
+  blob: Blob
 ): Promise<'shared-native' | 'opened-x'> {
-  const text = buildShareText(data, pageUrl);
+  const text = buildShareText();
   const file = new File([blob], 'aim-master-result.png', { type: 'image/png' });
 
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
@@ -162,14 +164,11 @@ export async function shareResult(
       const shareData: ShareData =
         typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })
           ? {
-              title: 'AIM MASTER',
               text,
               files: [file],
             }
           : {
-              title: 'AIM MASTER',
               text,
-              url: pageUrl,
             };
       await navigator.share(shareData);
       return 'shared-native';
