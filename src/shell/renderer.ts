@@ -4,6 +4,134 @@ import { formatTimeSeconds } from './storage';
 export const LOGICAL_WIDTH = 240;
 export const LOGICAL_HEIGHT = 272; // 32px Top HUD + 240x240 Square Playfield
 
+export interface FireworkParticle {
+  readonly x: number;
+  readonly y: number;
+  readonly size: number;
+  readonly color: string;
+}
+
+interface FireworkLauncher {
+  readonly cx: number;
+  readonly cy: number;
+  readonly periodMs: number;
+  readonly phaseOffsetMs: number;
+  readonly maxRadius: number;
+  readonly primaryColor: string;
+  readonly secondaryColor: string;
+}
+
+const FIREWORK_LAUNCHERS: readonly FireworkLauncher[] = [
+  {
+    cx: 54,
+    cy: 78,
+    periodMs: 1100,
+    phaseOffsetMs: 0,
+    maxRadius: 38,
+    primaryColor: '#ffcc00',
+    secondaryColor: '#ff3366',
+  },
+  {
+    cx: 186,
+    cy: 74,
+    periodMs: 1250,
+    phaseOffsetMs: 320,
+    maxRadius: 42,
+    primaryColor: '#00ffcc',
+    secondaryColor: '#ffff00',
+  },
+  {
+    cx: 120,
+    cy: 96,
+    periodMs: 980,
+    phaseOffsetMs: 620,
+    maxRadius: 46,
+    primaryColor: '#ff55ff',
+    secondaryColor: '#00ff66',
+  },
+  {
+    cx: 68,
+    cy: 164,
+    periodMs: 1350,
+    phaseOffsetMs: 180,
+    maxRadius: 34,
+    primaryColor: '#ff6600',
+    secondaryColor: '#ffffff',
+  },
+  {
+    cx: 174,
+    cy: 158,
+    periodMs: 1180,
+    phaseOffsetMs: 790,
+    maxRadius: 36,
+    primaryColor: '#00ff66',
+    secondaryColor: '#ffcc00',
+  },
+];
+
+export function computeFireworkParticles(timeMs: number): readonly FireworkParticle[] {
+  const safeTime = Math.max(0, Number.isFinite(timeMs) ? timeMs : 0);
+  const particles: FireworkParticle[] = [];
+
+  for (const launcher of FIREWORK_LAUNCHERS) {
+    const localTime = (safeTime + launcher.phaseOffsetMs) % launcher.periodMs;
+    const progress = localTime / launcher.periodMs;
+
+    if (progress < 0.22) {
+      // Rising rocket trail from horizon (y=236) to burst center (cx, cy)
+      const riseT = progress / 0.22;
+      const ry = 236 - (236 - launcher.cy) * riseT;
+      particles.push({
+        x: Math.round(launcher.cx),
+        y: Math.round(ry),
+        size: 3,
+        color: '#ffffff',
+      });
+      particles.push({
+        x: Math.round(launcher.cx),
+        y: Math.round(ry + 5),
+        size: 2,
+        color: launcher.primaryColor,
+      });
+    } else {
+      // Radial 8-bit spark burst
+      const burstT = (progress - 0.22) / 0.78;
+      // Ease out expansion + slight gravity droop
+      const easeOut = 1 - (1 - burstT) * (1 - burstT);
+      const outerR = launcher.maxRadius * easeOut;
+      const innerR = outerR * 0.55;
+      const gravityDrop = burstT * burstT * 14;
+      const sparkSize = burstT < 0.7 ? 3 : 2;
+
+      const spokeCount = 12;
+      for (let i = 0; i < spokeCount; i++) {
+        const angle = (i * Math.PI * 2) / spokeCount;
+        const ox = launcher.cx + Math.cos(angle) * outerR;
+        const oy = launcher.cy + Math.sin(angle) * outerR + gravityDrop;
+        particles.push({
+          x: Math.round(ox),
+          y: Math.round(oy),
+          size: sparkSize,
+          color: i % 2 === 0 ? launcher.primaryColor : launcher.secondaryColor,
+        });
+
+        if (i % 2 === 0 && burstT < 0.85) {
+          const ix = launcher.cx + Math.cos(angle + 0.26) * innerR;
+          const iy = launcher.cy + Math.sin(angle + 0.26) * innerR + gravityDrop * 0.6;
+          particles.push({
+            x: Math.round(ix),
+            y: Math.round(iy),
+            size: 2,
+            color: '#ffffff',
+          });
+        }
+      }
+    }
+  }
+
+  return particles;
+}
+
 function drawTarget(ctx: CanvasRenderingContext2D, target: ActiveTarget): void {
   if (target.hit) {
     return;
@@ -53,15 +181,38 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, x: number, y: number): voi
   ctx.fillRect(cx - 1, cy - 1, 2, 2);
 }
 
+function drawCalibrationGrid(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0, 255, 204, 0.28)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+
+  // Vertical center guide (x = 120)
+  ctx.beginPath();
+  ctx.moveTo(120, 34);
+  ctx.lineTo(120, 236);
+  ctx.stroke();
+
+  // Horizontal center guide (y = 152)
+  ctx.beginPath();
+  ctx.moveTo(8, 152);
+  ctx.lineTo(232, 152);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function renderGame(
   ctx: CanvasRenderingContext2D,
   state: GameState,
-  totalWaves: number
+  totalWaves: number,
+  nowMs: number = 0
 ): void {
   ctx.imageSmoothingEnabled = false;
 
   // Square Playfield sky background (y: 32..272 is 240x240)
-  ctx.fillStyle = '#14142b';
+  // Slightly brighter navy on TITLE/RESULT so crosshair movement is crystal clear while tuning options
+  ctx.fillStyle =
+    state.phase === 'TITLE' || state.phase === 'RESULT' ? '#1c1c3c' : '#14142b';
   ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
   // Retro horizon & ground strip at bottom of 240x240 square (y: 236..272)
@@ -69,6 +220,21 @@ export function renderGame(
   ctx.fillRect(0, 236, LOGICAL_WIDTH, 36);
   ctx.fillStyle = '#5c3820';
   ctx.fillRect(0, 236, LOGICAL_WIDTH, 3);
+
+  if (state.phase === 'TITLE' || state.phase === 'RESULT') {
+    drawCalibrationGrid(ctx);
+  }
+
+  // Celebratory 8-bit fireworks in the background on NEW RECORD
+  if (state.phase === 'RESULT' && state.isNewRecord) {
+    const particles = computeFireworkParticles(nowMs);
+    for (const p of particles) {
+      if (p.y >= 32 && p.y <= 268) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - 1, p.y - 1, p.size, p.size);
+      }
+    }
+  }
 
   // Top HUD (y: 0..32)
   ctx.fillStyle = '#000000';
@@ -114,31 +280,9 @@ export function renderGame(
     ctx.fillText('HIT!', ex - 12, ey - 14);
   }
 
-  // Motion trail
-  if (state.recentTrail.length > 1) {
-    ctx.save();
-    ctx.strokeStyle = '#00ff66';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    for (let i = 0; i < state.recentTrail.length; i++) {
-      const pt = state.recentTrail[i];
-      if (i === 0) {
-        ctx.moveTo(pt.x, pt.y);
-      } else {
-        ctx.lineTo(pt.x, pt.y);
-      }
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // Crosshair reticle
-  drawCrosshair(ctx, state.crosshair.x, state.crosshair.y);
-
-  // Phase overlays
+  // Phase overlays (drawn BEFORE crosshair so the crosshair stays visible on top!)
   if (state.phase === 'TITLE') {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(20, 56, LOGICAL_WIDTH - 40, 96);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -170,4 +314,25 @@ export function renderGame(
     ctx.font = 'bold 18px monospace';
     ctx.fillText(label, 68, 152);
   }
+
+  // Motion trail & Crosshair reticle drawn last so they are always visible while testing options
+  if (state.recentTrail.length > 1) {
+    ctx.save();
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (let i = 0; i < state.recentTrail.length; i++) {
+      const pt = state.recentTrail[i];
+      if (i === 0) {
+        ctx.moveTo(pt.x, pt.y);
+      } else {
+        ctx.lineTo(pt.x, pt.y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawCrosshair(ctx, state.crosshair.x, state.crosshair.y);
 }

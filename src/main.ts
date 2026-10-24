@@ -247,8 +247,9 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
   };
   latestResultData = data;
   resultHeading.textContent = state.isNewRecord
-    ? `NEW RECORD! ${formatTimeSeconds(state.elapsedMs)}s`
+    ? `★ NEW RECORD! ${formatTimeSeconds(state.elapsedMs)}s ★`
     : `CLEAR! ${formatTimeSeconds(state.elapsedMs)}s`;
+  resultHeading.classList.toggle('new-record', state.isNewRecord);
   resultTimestamp.textContent = clearedAt;
 
   try {
@@ -279,9 +280,9 @@ function frameLoop(nowMs: number): void {
     void handleEnterResult(gameState);
   }
 
-  renderGame(ctx, gameState, DEFAULT_WAVES.length);
+  renderGame(ctx, gameState, DEFAULT_WAVES.length, nowMs);
   requestAnimationFrame(frameLoop);
 }
 
-renderGame(ctx, gameState, DEFAULT_WAVES.length);
+renderGame(ctx, gameState, DEFAULT_WAVES.length, performance.now());
 requestAnimationFrame(frameLoop);

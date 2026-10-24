@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialGameState, startCountdown, stepGame } from '../core/game';
 import { DEFAULT_WAVES } from '../core/waves';
-import { LOGICAL_HEIGHT, LOGICAL_WIDTH, renderGame } from './renderer';
+import {
+  LOGICAL_HEIGHT,
+  LOGICAL_WIDTH,
+  computeFireworkParticles,
+  renderGame,
+} from './renderer';
 
 function createMockCanvasContext(): CanvasRenderingContext2D {
   return {
@@ -44,5 +49,23 @@ describe('renderer', () => {
 
     expect(ctx.fillRect).toHaveBeenCalled();
     expect(ctx.fillText).toHaveBeenCalled();
+  });
+
+  it('generates firework particles and renders fireworks when phase is RESULT with isNewRecord', () => {
+    const particles = computeFireworkParticles(500);
+    expect(particles.length).toBeGreaterThan(10);
+
+    const ctx = createMockCanvasContext();
+    const baseState = createInitialGameState(5000);
+    const newRecordResultState = {
+      ...baseState,
+      phase: 'RESULT' as const,
+      elapsedMs: 4200,
+      bestTimeMs: 4200,
+      isNewRecord: true,
+    };
+
+    renderGame(ctx, newRecordResultState, DEFAULT_WAVES.length, 500);
+    expect(ctx.fillRect).toHaveBeenCalled();
   });
 });

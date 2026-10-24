@@ -67,10 +67,11 @@ body {
   pointer-events: auto;
 }
 
+/* Light, translucent result overlay so background crosshair movement & fireworks shine through */
 .result-panel {
-  justify-content: center;
-  background: rgba(5, 5, 15, 0.92);
-  padding: 12px;
+  justify-content: space-between;
+  background: rgba(12, 12, 32, 0.24);
+  padding: 36px 12px 12px;
   gap: 6px;
 }
 
@@ -82,21 +83,48 @@ body {
   color: #ffcc00;
   font-size: 16px;
   letter-spacing: 1px;
+  text-shadow: 2px 2px 0 #000000, -1px -1px 0 #000000;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 4px 10px;
+  border: 2px solid #ffcc00;
+}
+
+.result-title.new-record {
+  color: #ffff00;
+  border-color: #ff3366;
   text-shadow: 2px 2px 0 #ff3333;
+  animation: record-pulse 0.35s infinite alternate;
+}
+
+@keyframes record-pulse {
+  0% {
+    transform: scale(1);
+    border-color: #ffcc00;
+    box-shadow: 0 0 8px #ffcc00;
+  }
+  100% {
+    transform: scale(1.06);
+    border-color: #00ffcc;
+    box-shadow: 0 0 16px #ff3366;
+  }
 }
 
 .result-timestamp {
-  color: #aaaaaa;
+  color: #ffffff;
   font-size: 11px;
   font-weight: bold;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 2px 8px;
 }
 
 .result-card-preview {
   width: 100%;
-  max-width: 220px;
+  max-width: 196px;
   height: auto;
   border: 2px solid #ffffff;
   image-rendering: pixelated;
+  opacity: 0.9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
 }
 
 .result-actions {
@@ -239,22 +267,25 @@ body {
   color: #000000;
 }
 
-/* Landscape orientation layout */
+/* Landscape orientation: keep .cabinet at exact screen center using 3-column grid */
 @media (orientation: landscape) {
   .app-shell {
-    flex-direction: row;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
+    column-gap: 12px;
+    padding: 6px 12px;
   }
 
   .cabinet {
-    height: min(92dvh, calc(58vw * 272 / 240));
+    grid-column: 2;
+    height: min(94dvh, calc(44vw * 272 / 240));
     width: auto;
   }
 
   .side-dock {
-    width: min(36vw, 260px);
+    grid-column: 3;
+    justify-self: start;
+    width: min(26vw, 230px);
   }
 }
