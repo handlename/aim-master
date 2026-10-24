@@ -12,22 +12,19 @@
   <body>
     <main class="app-shell">
       <div class="cabinet">
-        <canvas id="game-canvas" width="240" height="400"></canvas>
+        <canvas id="game-canvas" width="240" height="272"></canvas>
 
         <!-- Title Start Overlay -->
         <div id="title-overlay" class="overlay-panel">
           <button id="start-btn" type="button" class="arcade-btn primary-btn">
             START GAME
           </button>
-          <p class="hint-text">
-            スマホを地面と垂直・正面に構えてタップ！<br />
-            (PCではマウス/タッチ移動で操作できます)
-          </p>
         </div>
 
         <!-- Result Overlay Modal -->
         <div id="result-overlay" class="overlay-panel result-panel hidden">
           <h2 id="result-heading" class="result-title">STAGE CLEAR!</h2>
+          <p id="result-timestamp" class="result-timestamp"></p>
           <img
             id="result-card-img"
             class="result-card-preview"
@@ -37,19 +34,14 @@
             <button id="share-btn" type="button" class="arcade-btn share-btn">
               SHARE RESULT
             </button>
-            <a
-              id="download-link"
-              class="arcade-btn secondary-btn"
-              download="aim-master-result.png"
-            >
-              SAVE IMAGE
-            </a>
+            <button id="retry-btn" type="button" class="arcade-btn primary-btn">
+              PLAY AGAIN
+            </button>
           </div>
-          <button id="retry-btn" type="button" class="arcade-btn primary-btn">
-            PLAY AGAIN
-          </button>
         </div>
+      </div>
 
+      <div class="side-dock">
         <!-- Shared Options Panel (Visible ONLY in TITLE & RESULT screens) -->
         <section id="options-panel" class="options-panel" aria-label="Play Options">
           <div class="options-header">OPTIONS</div>
@@ -76,12 +68,12 @@
             </button>
           </div>
         </section>
-      </div>
 
-      <div class="controls-bar">
-        <button id="reset-center-btn" type="button" class="reset-btn">
-          [ RESET CENTER / 正面リセット ]
-        </button>
+        <div class="controls-bar">
+          <button id="reset-center-btn" type="button" class="reset-btn">
+            [ RESET CENTER / 正面リセット ]
+          </button>
+        </div>
       </div>
     </main>
     <script type="module" src="/src/main.ts"></script>

@@ -2,7 +2,7 @@ import { ActiveTarget, GameState } from '../core/game';
 import { formatTimeSeconds } from './storage';
 
 export const LOGICAL_WIDTH = 240;
-export const LOGICAL_HEIGHT = 400;
+export const LOGICAL_HEIGHT = 272; // 32px Top HUD + 240x240 Square Playfield
 
 function drawTarget(ctx: CanvasRenderingContext2D, target: ActiveTarget): void {
   if (target.hit) {
@@ -60,42 +60,42 @@ export function renderGame(
 ): void {
   ctx.imageSmoothingEnabled = false;
 
-  // Playfield sky background
+  // Square Playfield sky background (y: 32..272 is 240x240)
   ctx.fillStyle = '#14142b';
   ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
-  // Retro horizon & ground strip (y: 300..356)
+  // Retro horizon & ground strip at bottom of 240x240 square (y: 236..272)
   ctx.fillStyle = '#3a2010';
-  ctx.fillRect(0, 304, LOGICAL_WIDTH, 52);
+  ctx.fillRect(0, 236, LOGICAL_WIDTH, 36);
   ctx.fillStyle = '#5c3820';
-  ctx.fillRect(0, 304, LOGICAL_WIDTH, 3);
+  ctx.fillRect(0, 236, LOGICAL_WIDTH, 3);
 
-  // Top HUD (y: 0..36)
+  // Top HUD (y: 0..32)
   ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, LOGICAL_WIDTH, 36);
+  ctx.fillRect(0, 0, LOGICAL_WIDTH, 32);
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 34, LOGICAL_WIDTH, 2);
+  ctx.fillRect(0, 30, LOGICAL_WIDTH, 2);
 
   ctx.font = 'bold 10px monospace';
   ctx.textBaseline = 'middle';
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('TIME', 6, 18);
+  ctx.fillText('TIME', 6, 15);
   ctx.fillStyle = '#ffcc00';
-  ctx.fillText(formatTimeSeconds(state.elapsedMs), 34, 18);
+  ctx.fillText(formatTimeSeconds(state.elapsedMs), 34, 15);
 
   const remainingTargets = state.targets.filter((t) => !t.hit).length;
   const totalWaveTargets = state.targets.length;
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('WV', 98, 18);
+  ctx.fillText('WV', 98, 15);
   ctx.fillStyle = '#00ffcc';
-  ctx.fillText(`${Math.min(totalWaves, state.waveIndex + 1)}/${totalWaves}`, 114, 18);
+  ctx.fillText(`${Math.min(totalWaves, state.waveIndex + 1)}/${totalWaves}`, 114, 15);
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('TGT', 164, 18);
+  ctx.fillText('TGT', 164, 15);
   ctx.fillStyle = '#00ffcc';
-  ctx.fillText(`${remainingTargets}/${totalWaveTargets}`, 188, 18);
+  ctx.fillText(`${remainingTargets}/${totalWaveTargets}`, 188, 15);
 
   // Active targets
   for (const target of state.targets) {
@@ -138,47 +138,36 @@ export function renderGame(
 
   // Phase overlays
   if (state.phase === 'TITLE') {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.76)';
-    ctx.fillRect(16, 52, LOGICAL_WIDTH - 32, 134);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    ctx.fillRect(20, 56, LOGICAL_WIDTH - 40, 96);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(16, 52, LOGICAL_WIDTH - 32, 134);
+    ctx.strokeRect(20, 56, LOGICAL_WIDTH - 40, 96);
 
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 20px monospace';
-    ctx.fillText('AIM MASTER', 56, 80);
+    ctx.fillText('AIM MASTER', 56, 84);
 
     ctx.fillStyle = '#00ffcc';
     ctx.font = 'bold 10px monospace';
-    ctx.fillText('HOLD PHONE VERTICALLY', 48, 108);
-    ctx.fillText('SWEEP CROSSHAIR TO HIT!', 42, 126);
+    ctx.fillText('8-BIT QUICK DRAW', 68, 106);
 
     const bestLabel =
       state.bestTimeMs !== null ? `BEST: ${formatTimeSeconds(state.bestTimeMs)}s` : 'BEST: --.---s';
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(bestLabel, 66, 158);
+    ctx.fillText(bestLabel, 66, 132);
   } else if (state.phase === 'COUNTDOWN') {
     const sec = Math.ceil(state.countdownRemainingMs / 600);
     const label = sec >= 1 ? `READY... ${sec}` : 'GO!';
     ctx.fillStyle = '#000000';
-    ctx.fillRect(48, 168, LOGICAL_WIDTH - 96, 44);
+    ctx.fillRect(48, 130, LOGICAL_WIDTH - 96, 44);
     ctx.strokeStyle = '#ffcc00';
     ctx.lineWidth = 2;
-    ctx.strokeRect(48, 168, LOGICAL_WIDTH - 96, 44);
+    ctx.strokeRect(48, 130, LOGICAL_WIDTH - 96, 44);
 
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 18px monospace';
-    ctx.fillText(label, 68, 190);
+    ctx.fillText(label, 68, 152);
   }
-
-  // Bottom HUD (y: 356..400)
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 356, LOGICAL_WIDTH, 44);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 356, LOGICAL_WIDTH, 2);
-
-  ctx.fillStyle = '#aaaaaa';
-  ctx.font = 'bold 10px monospace';
-  ctx.fillText('[ TAP BAR BELOW TO RESET CENTER ]', 16, 378);
 }

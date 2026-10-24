@@ -17,6 +17,7 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, renderGame } from './shell/renderer';
 import { ResultCardData, generateResultCardBlob, shareResult } from './shell/share';
 import {
   formatTimeSeconds,
+  formatTimestamp,
   loadAimOptions,
   loadBestTime,
   saveAimOptions,
@@ -33,11 +34,11 @@ const sensitivityValue = document.getElementById('sensitivity-value') as HTMLSpa
 const invertXBtn = document.getElementById('invert-x-btn') as HTMLButtonElement;
 const invertYBtn = document.getElementById('invert-y-btn') as HTMLButtonElement;
 const resultHeading = document.getElementById('result-heading') as HTMLHeadingElement;
+const resultTimestamp = document.getElementById('result-timestamp') as HTMLParagraphElement;
 const resultCardImg = document.getElementById('result-card-img') as HTMLImageElement;
 const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 const shareBtn = document.getElementById('share-btn') as HTMLButtonElement;
-const downloadLink = document.getElementById('download-link') as HTMLAnchorElement;
 const resetCenterBtn = document.getElementById('reset-center-btn') as HTMLButtonElement;
 
 const audio = new RetroAudio();
@@ -170,11 +171,6 @@ function updateCrosshairFromPointer(clientX: number, clientY: number): void {
   const logicalX = ((clientX - rect.left) / rect.width) * LOGICAL_WIDTH;
   const logicalY = ((clientY - rect.top) / rect.height) * LOGICAL_HEIGHT;
 
-  if (logicalY >= 356) {
-    sensorState = resetCenter(sensorState);
-    return;
-  }
-
   sensorState = {
     ...sensorState,
     crosshair: clampPoint({ x: logicalX, y: logicalY }, PLAYFIELD_BOUNDS),
@@ -188,11 +184,6 @@ canvas.addEventListener('pointermove', (e: PointerEvent) => {
 });
 
 canvas.addEventListener('pointerdown', (e: PointerEvent) => {
-  const rect = canvas.getBoundingClientRect();
-  if (rect.height > 0 && ((e.clientY - rect.top) / rect.height) * LOGICAL_HEIGHT >= 356) {
-    sensorState = resetCenter(sensorState);
-    return;
-  }
   if (shouldApplyPointerFallback(hasMotionEvents, e.pointerType, 1)) {
     updateCrosshairFromPointer(e.clientX, e.clientY);
   }
@@ -246,22 +237,24 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
   if (state.bestTimeMs !== null && state.isNewRecord) {
     saveBestTime(state.bestTimeMs);
   }
+  const clearedAt = formatTimestamp(new Date());
   const data: ResultCardData = {
     clearTimeMs: state.elapsedMs,
     bestTimeMs: state.bestTimeMs ?? state.elapsedMs,
     isNewRecord: state.isNewRecord,
+    clearedAt,
     fullTrace: state.fullTrace,
   };
   latestResultData = data;
   resultHeading.textContent = state.isNewRecord
     ? `NEW RECORD! ${formatTimeSeconds(state.elapsedMs)}s`
     : `CLEAR! ${formatTimeSeconds(state.elapsedMs)}s`;
+  resultTimestamp.textContent = clearedAt;
 
   try {
     const { blob, dataUrl } = await generateResultCardBlob(data);
     latestResultBlob = blob;
     resultCardImg.src = dataUrl;
-    downloadLink.href = dataUrl;
   } catch {
     // Ignore image generation failure in non-canvas environments
   }

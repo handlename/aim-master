@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatTimeSeconds,
+  formatTimestamp,
   loadAimOptions,
   loadBestTime,
   saveAimOptions,
@@ -29,9 +30,18 @@ describe('storage and share helpers', () => {
     expect(formatTimeSeconds(50)).toBe('00.050');
   });
 
-  it('builds share text and X intent URL', () => {
+  it('builds share text and X intent URL and formats timestamp', () => {
+    const ts = formatTimestamp(new Date(2026, 9, 24, 10, 40, 5));
+    expect(ts).toBe('2026-10-24 10:40:05');
+
     const text = buildShareText(
-      { clearTimeMs: 4823, bestTimeMs: 4823, isNewRecord: true, fullTrace: [] },
+      {
+        clearTimeMs: 4823,
+        bestTimeMs: 4823,
+        isNewRecord: true,
+        clearedAt: ts,
+        fullTrace: [],
+      },
       'https://example.com/aim-master'
     );
     expect(text).toContain('04.823s');

@@ -5,13 +5,14 @@ export interface ResultCardData {
   readonly clearTimeMs: number;
   readonly bestTimeMs: number;
   readonly isNewRecord: boolean;
+  readonly clearedAt: string;
   readonly fullTrace: readonly Point[];
 }
 
 export function buildShareText(data: ResultCardData, pageUrl: string): string {
   const timeStr = `${formatTimeSeconds(data.clearTimeMs)}s`;
   const badge = data.isNewRecord ? ' [NEW RECORD!]' : '';
-  return `🎯 AIM MASTER CLEAR! TIME: ${timeStr}${badge}\n#AimMaster\n${pageUrl}`.trim();
+  return `🎯 AIM MASTER CLEAR! TIME: ${timeStr}${badge} (${data.clearedAt})\n#AimMaster\n${pageUrl}`.trim();
 }
 
 export function buildXIntentUrl(text: string): string {
@@ -42,13 +43,13 @@ export function renderResultCardToCanvas(
   ctx.fillStyle = '#000000';
   ctx.fillRect(24, 24, width - 48, 56);
   ctx.fillStyle = '#ffcc00';
-  ctx.font = 'bold 28px monospace';
+  ctx.font = 'bold 26px monospace';
   ctx.textBaseline = 'middle';
-  ctx.fillText('AIM MASTER', 44, 54);
+  ctx.fillText('AIM MASTER', 40, 52);
 
-  ctx.fillStyle = '#00ffcc';
-  ctx.font = 'bold 16px monospace';
-  ctx.fillText('8-BIT QUICK DRAW', 240, 54);
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText(data.clearedAt, 376, 52);
 
   // Left side: Times & Rank
   const clearStr = `${formatTimeSeconds(data.clearTimeMs)}s`;
@@ -56,28 +57,28 @@ export function renderResultCardToCanvas(
 
   ctx.fillStyle = '#aaaaaa';
   ctx.font = 'bold 18px monospace';
-  ctx.fillText('CLEAR TIME', 44, 125);
+  ctx.fillText('CLEAR TIME', 44, 120);
 
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 46px monospace';
-  ctx.fillText(clearStr, 44, 178);
+  ctx.fillText(clearStr, 44, 170);
 
   if (data.isNewRecord) {
     ctx.fillStyle = '#ff3333';
-    ctx.fillRect(44, 212, 168, 30);
+    ctx.fillRect(44, 204, 168, 30);
     ctx.fillStyle = '#ffff00';
     ctx.font = 'bold 18px monospace';
-    ctx.fillText('★ NEW RECORD! ★', 52, 228);
+    ctx.fillText('★ NEW RECORD! ★', 52, 220);
   }
 
   ctx.fillStyle = '#aaaaaa';
   ctx.font = 'bold 16px monospace';
-  ctx.fillText(`BEST TIME: ${bestStr}`, 44, 276);
+  ctx.fillText(`BEST TIME: ${bestStr}`, 44, 266);
 
   // Bullseye emblem
-  const bx = 95;
-  const by = 330;
-  const radii = [28, 20, 12, 5];
+  const bx = 84;
+  const by = 326;
+  const radii = [24, 17, 10, 4];
   const colors = ['#ff3333', '#ffffff', '#ff3333', '#ffffff'];
   for (let i = 0; i < radii.length; i++) {
     ctx.fillStyle = colors[i];
@@ -87,24 +88,23 @@ export function renderResultCardToCanvas(
   }
 
   ctx.fillStyle = '#00ff66';
-  ctx.font = 'bold 15px monospace';
-  ctx.fillText('ALL 10 WAVES CLEARED', 140, 330);
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText('ALL 10 WAVES CLEARED', 122, 326);
 
-  // Right side: Aim Trajectory Mini-Map (playfield 240x320 scaled by 0.75 -> 180x240)
-  const mapX = 376;
-  const mapY = 104;
-  const mapW = 180;
-  const mapH = 240;
+  // Right side: Square Aim Trajectory Mini-Map (playfield 240x240 -> 200x200)
+  const mapX = 356;
+  const mapY = 128;
+  const mapSize = 200;
 
   ctx.fillStyle = '#060612';
-  ctx.fillRect(mapX, mapY, mapW, mapH);
+  ctx.fillRect(mapX, mapY, mapSize, mapSize);
   ctx.strokeStyle = '#00ffcc';
   ctx.lineWidth = 2;
-  ctx.strokeRect(mapX, mapY, mapW, mapH);
+  ctx.strokeRect(mapX, mapY, mapSize, mapSize);
 
   ctx.fillStyle = '#00ffcc';
   ctx.font = 'bold 12px monospace';
-  ctx.fillText('AIM TRACE LOG', mapX + 40, mapY - 12);
+  ctx.fillText('AIM TRACE LOG (SQUARE)', mapX + 18, mapY - 12);
 
   if (data.fullTrace.length > 1) {
     ctx.strokeStyle = '#00ff66';
@@ -112,9 +112,9 @@ export function renderResultCardToCanvas(
     ctx.beginPath();
     for (let i = 0; i < data.fullTrace.length; i++) {
       const pt = data.fullTrace[i];
-      // Map playfield x: 0..240 -> 0..180, y: 36..356 -> 0..240
-      const px = mapX + Math.min(mapW, Math.max(0, (pt.x / 240) * mapW));
-      const py = mapY + Math.min(mapH, Math.max(0, ((pt.y - 36) / 320) * mapH));
+      // Map square playfield x: 0..240 -> 0..200, y: 32..272 -> 0..200
+      const px = mapX + Math.min(mapSize, Math.max(0, (pt.x / 240) * mapSize));
+      const py = mapY + Math.min(mapSize, Math.max(0, ((pt.y - 32) / 240) * mapSize));
       if (i === 0) {
         ctx.moveTo(px, py);
       } else {

@@ -28,9 +28,9 @@ function createMockCanvasContext(): CanvasRenderingContext2D {
 }
 
 describe('renderer', () => {
-  it('exports 240x400 logical resolution and renders TITLE, COUNTDOWN, PLAYING, and RESULT states cleanly', () => {
+  it('exports 240x272 logical resolution (32px HUD + 240x240 square playfield) and renders states cleanly', () => {
     expect(LOGICAL_WIDTH).toBe(240);
-    expect(LOGICAL_HEIGHT).toBe(400);
+    expect(LOGICAL_HEIGHT).toBe(272);
 
     const ctx = createMockCanvasContext();
     let state = createInitialGameState(4500);

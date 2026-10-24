@@ -29,22 +29,50 @@ describe('sensor core', () => {
     expect(s1.crosshair.y).toBeLessThan(PLAYFIELD_CENTER.y);
   });
 
-  it('compensates for roll angle using gravity vector and safely handles zero gravity vector', () => {
-    const s0 = createInitialSensorState(4.0);
-    // Phone tilted 90 deg counter-clockwise: gx = -9.8, gy = 0
-    const tilted = stepCrosshairFromMotion(s0, {
-      alphaRate: 0,
-      betaRate: 25,
+  it('compensates for roll angle and works identically when phone is held horizontally in Landscape-Left or Landscape-Right', () => {
+    const s0 = createInitialSensorState(6.0);
+    // Landscape-Left (rotated 90 deg CCW: gx = -9.8, gy = 0, gz = 0)
+    // Pure horizontal pan right in real world is negative alphaRate (betaRate = 0) -> only X should increase!
+    const landscapeLeftPan = stepCrosshairFromMotion(s0, {
+      alphaRate: -25,
+      betaRate: 0,
       gammaRate: 0,
       gx: -9.8,
       gy: 0,
       gz: 0,
       dtSec: 0.02,
     });
-    expect(Number.isFinite(tilted.crosshair.x)).toBe(true);
-    expect(Number.isFinite(tilted.crosshair.y)).toBe(true);
+    expect(landscapeLeftPan.crosshair.x - PLAYFIELD_CENTER.x).toBeCloseTo(3.0, 2);
+    expect(landscapeLeftPan.crosshair.y).toBeCloseTo(PLAYFIELD_CENTER.y, 2);
 
-    // Zero gravity fallback (gx=0, gy=0) must not produce NaN
+    // Pure vertical tilt up in Landscape-Left is negative betaRate (alphaRate = 0) -> only Y should decrease!
+    const landscapeLeftTilt = stepCrosshairFromMotion(s0, {
+      alphaRate: 0,
+      betaRate: -25,
+      gammaRate: 0,
+      gx: -9.8,
+      gy: 0,
+      gz: 0,
+      dtSec: 0.02,
+    });
+    expect(landscapeLeftTilt.crosshair.x).toBeCloseTo(PLAYFIELD_CENTER.x, 2);
+    expect(PLAYFIELD_CENTER.y - landscapeLeftTilt.crosshair.y).toBeCloseTo(3.0, 2);
+
+    // Landscape-Right (rotated 90 deg CW: gx = +9.8, gy = 0, gz = 0)
+    // Pure horizontal pan right is positive alphaRate; pure vertical tilt up is positive betaRate
+    const landscapeRight = stepCrosshairFromMotion(s0, {
+      alphaRate: 25,
+      betaRate: 25,
+      gammaRate: 0,
+      gx: 9.8,
+      gy: 0,
+      gz: 0,
+      dtSec: 0.02,
+    });
+    expect(landscapeRight.crosshair.x - PLAYFIELD_CENTER.x).toBeCloseTo(3.0, 2);
+    expect(PLAYFIELD_CENTER.y - landscapeRight.crosshair.y).toBeCloseTo(3.0, 2);
+
+    // Zero gravity fallback (gx=0, gy=0, gz=0) must not produce NaN
     const zeroG = stepCrosshairFromMotion(s0, {
       alphaRate: 10,
       betaRate: 10,

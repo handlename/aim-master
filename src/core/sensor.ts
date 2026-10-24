@@ -34,12 +34,12 @@ export const PLAYFIELD_BOUNDS: Rect = {
   minX: 8,
   minY: 40,
   maxX: 232,
-  maxY: 352,
+  maxY: 264,
 };
 
 export const PLAYFIELD_CENTER: Point = {
   x: 120,
-  y: 196,
+  y: 152,
 };
 
 const MAX_DT_SEC = 0.05;
@@ -115,31 +115,26 @@ export function stepCrosshairFromMotion(
   const gy = sample.gy ?? 0;
   const gz = sample.gz ?? 0;
   const gMag3D = Math.hypot(gx, gy, gz);
-  const gyzMag = Math.hypot(gy, gz);
+  const gxyMag = Math.hypot(gx, gy);
 
-  // Project horizontal world yaw onto the phone's YZ gravity plane so betaRate and gammaRate
-  // always combine constructively regardless of whether the phone is tilted forward or backward.
+  // Orientation-independent 3D projection:
+  // - World horizontal pan (yaw around gravity axis) is the 3D dot product ω · (g / |g_3D|).
+  // - World vertical tilt (pitch around horizontal axis perpendicular to gravity in screen XY) is (gy*alphaRate - gx*betaRate) / |g_xy|.
+  // This behaves identically in Portrait, Landscape-Left, Landscape-Right, and any roll angle.
   const rawHorizDegPerSec =
-    gyzMag > 0.1 ? (gy * betaRate + gz * gammaRate) / gyzMag : -betaRate - gammaRate;
+    gMag3D > 0.1
+      ? (gx * alphaRate + gy * betaRate + gz * gammaRate) / gMag3D
+      : -betaRate - gammaRate;
 
-  // Compensate for light-gun tangent ray projection (d(tan θ)/dθ = 1 / cos^2 θ) when pitched up/down,
-  // preventing perceived loss of vertical/horizontal movement when aiming near the top of the screen.
-  const cosPitch = gMag3D > 0.1 ? Math.abs(gy) / gMag3D : 1;
+  const rawVertDegPerSec =
+    gxyMag > 0.1 ? (gy * alphaRate - gx * betaRate) / gxyMag : -alphaRate;
+
+  // Compensate for light-gun tangent ray projection (d(tan θ)/dθ = 1 / cos^2 θ) when pitched up/down
+  const cosPitch = gMag3D > 0.1 ? gxyMag / gMag3D : 1;
   const pitchRayGain = 1 / Math.max(0.55, cosPitch * cosPitch);
 
-  const rawVertDegPerSec = -alphaRate * pitchRayGain;
-  const boostedHorizDegPerSec = rawHorizDegPerSec * Math.sqrt(pitchRayGain);
-
-  // Compute screen roll using 3D gravity magnitude so pitching into Z never shrinks cosRoll.
-  let cosRoll = 1;
-  let sinRoll = 0;
-  if (gMag3D > 0.1) {
-    sinRoll = Math.min(0.98, Math.max(-0.98, gx / gMag3D));
-    cosRoll = Math.sqrt(1 - sinRoll * sinRoll) * (gy <= 0 ? 1 : -1);
-  }
-
-  const worldHorizRate = boostedHorizDegPerSec * cosRoll - rawVertDegPerSec * sinRoll;
-  const worldVertRate = boostedHorizDegPerSec * sinRoll + rawVertDegPerSec * cosRoll;
+  const worldHorizRate = rawHorizDegPerSec * Math.sqrt(pitchRayGain);
+  const worldVertRate = rawVertDegPerSec * pitchRayGain;
 
   const dirX = state.invertX ? -1 : 1;
   const dirY = state.invertY ? -1 : 1;
