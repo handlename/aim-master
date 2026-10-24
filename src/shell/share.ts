@@ -6,11 +6,43 @@ export interface ResultCardData {
   readonly bestTimeMs: number;
   readonly isNewRecord: boolean;
   readonly penaltyHits: number;
+  readonly playDurationMs?: number;
+  readonly totalDistancePx?: number;
+  readonly normalTargetHits?: number;
   readonly clearedAt: string;
   readonly fullTrace: readonly Point[];
 }
 
 export const PUBLIC_GAME_URL = 'https://handlename.github.io/aim-master/';
+
+export function formatAimStats(
+  data: Pick<
+    ResultCardData,
+    'clearTimeMs' | 'playDurationMs' | 'totalDistancePx' | 'normalTargetHits'
+  >
+): {
+  readonly avgSpeedLabel: string;
+  readonly avgIntervalLabel: string;
+} {
+  const effectiveDurationMs =
+    data.playDurationMs !== undefined ? data.playDurationMs : data.clearTimeMs;
+  const distPx = data.totalDistancePx ?? 0;
+  const hits = data.normalTargetHits ?? 0;
+
+  const avgSpeed =
+    effectiveDurationMs > 0 && Number.isFinite(distPx)
+      ? Math.round(distPx / (effectiveDurationMs / 1000))
+      : 0;
+  const avgSplit =
+    effectiveDurationMs > 0 && hits > 0
+      ? `${(effectiveDurationMs / 1000 / hits).toFixed(2)}s`
+      : '--.--s';
+
+  return {
+    avgSpeedLabel: `AVG SPEED: ${avgSpeed} px/s`,
+    avgIntervalLabel: `AVG SPLIT: ${avgSplit}`,
+  };
+}
 
 export function buildShareText(data: Pick<ResultCardData, 'clearTimeMs'>): string {
   const timeStr = `${formatTimeSeconds(data.clearTimeMs)}s`;
@@ -129,6 +161,13 @@ export function renderResultCardToCanvas(
     }
     ctx.stroke();
   }
+
+  // Subtle aim movement & target destruction interval stats below mini-map
+  const { avgSpeedLabel, avgIntervalLabel } = formatAimStats(data);
+  ctx.fillStyle = '#8888aa';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText(avgSpeedLabel, mapX, mapY + mapSize + 18);
+  ctx.fillText(avgIntervalLabel, mapX, mapY + mapSize + 36);
 }
 
 export async function generateResultCardBlob(

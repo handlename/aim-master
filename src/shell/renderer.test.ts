@@ -5,6 +5,7 @@ import {
   LOGICAL_HEIGHT,
   LOGICAL_WIDTH,
   computeFireworkParticles,
+  computeHitShatterParticles,
   renderGame,
 } from './renderer';
 
@@ -67,5 +68,39 @@ describe('renderer', () => {
 
     renderGame(ctx, newRecordResultState, DEFAULT_WAVES.length, 500);
     expect(ctx.fillRect).toHaveBeenCalled();
+  });
+
+  it('computes directional shatter particles biased toward the hit push direction', () => {
+    const effect = {
+      position: { x: 120, y: 152 },
+      remainingMs: 240,
+      durationMs: 480,
+      direction: { x: 1, y: 0 }, // Pushed right (+X)
+      kind: 'normal' as const,
+    };
+
+    const particles = computeHitShatterParticles(effect);
+    expect(particles.length).toBeGreaterThanOrEqual(20);
+
+    // Average particle X must be strongly shifted to the right of impact origin (120)
+    const avgX = particles.reduce((sum, p) => sum + p.x, 0) / particles.length;
+    expect(avgX).toBeGreaterThan(142);
+
+    // Includes large chunky fragments (size >= 5) as well as trailing sparks
+    const maxSize = Math.max(...particles.map((p) => p.size));
+    expect(maxSize).toBeGreaterThanOrEqual(5);
+
+    // Different hits produce randomized relative scatter patterns rather than identical symmetric arcs
+    const otherEffect = {
+      position: { x: 74, y: 98 },
+      remainingMs: 240,
+      durationMs: 480,
+      direction: { x: 1, y: 0 },
+      kind: 'normal' as const,
+    };
+    const otherParticles = computeHitShatterParticles(otherEffect);
+    const relOffsets1 = particles.map((p) => `${p.x - 120},${p.y - 152}`).join('|');
+    const relOffsets2 = otherParticles.map((p) => `${p.x - 74},${p.y - 98}`).join('|');
+    expect(relOffsets1).not.toBe(relOffsets2);
   });
 });

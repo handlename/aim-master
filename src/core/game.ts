@@ -1,4 +1,4 @@
-import { Point, segmentCircleIntersect } from './geometry';
+import { Point, computeHitPushDirection, segmentCircleIntersect } from './geometry';
 import { PLAYFIELD_CENTER } from './sensor';
 import {
   DEFAULT_WAVES,
@@ -26,6 +26,9 @@ export interface ActiveTarget {
 export interface HitEffect {
   readonly position: Point;
   readonly remainingMs: number;
+  readonly durationMs?: number;
+  readonly direction?: Point;
+  readonly seed?: number;
   readonly kind?: 'normal' | 'penalty';
 }
 
@@ -41,6 +44,9 @@ export interface GameState {
   readonly waveIndex: number;
   readonly waveElapsedMs: number;
   readonly elapsedMs: number;
+  readonly playDurationMs: number;
+  readonly totalDistancePx: number;
+  readonly normalTargetHits: number;
   readonly penaltyHits: number;
   readonly bestTimeMs: number | null;
   readonly isNewRecord: boolean;
@@ -54,8 +60,8 @@ export interface GameState {
 
 export const CROSSHAIR_HIT_RADIUS = 4;
 export const COUNTDOWN_DURATION_MS = 1800;
+export const HIT_EFFECT_DURATION_MS = 480;
 
-const HIT_EFFECT_DURATION_MS = 260;
 const TRAIL_MAX_AGE_MS = 180;
 const MAX_FULL_TRACE_POINTS = 600;
 const MAX_PLAYING_DT_MS = 50;
@@ -84,6 +90,9 @@ export function createInitialGameState(bestTimeMs: number | null): GameState {
     waveIndex: 0,
     waveElapsedMs: 0,
     elapsedMs: 0,
+    playDurationMs: 0,
+    totalDistancePx: 0,
+    normalTargetHits: 0,
     penaltyHits: 0,
     bestTimeMs,
     isNewRecord: false,
@@ -107,6 +116,9 @@ export function startCountdown(
     waveIndex: 0,
     waveElapsedMs: 0,
     elapsedMs: 0,
+    playDurationMs: 0,
+    totalDistancePx: 0,
+    normalTargetHits: 0,
     penaltyHits: 0,
     isNewRecord: false,
     crosshair: initialCrosshair,
@@ -129,6 +141,11 @@ function updateTrail(
   return [...aged, { x: nextCrosshair.x, y: nextCrosshair.y, ageMs: 0 }];
 }
 
+interface NewlyHitTarget {
+  readonly position: Point;
+  readonly direction: Point;
+}
+
 function evaluateSweptHits(
   targets: readonly ActiveTarget[],
   prevCrosshair: Point,
@@ -136,12 +153,12 @@ function evaluateSweptHits(
   waveElapsedSec: number
 ): {
   readonly updatedTargets: readonly ActiveTarget[];
-  readonly newlyHitNormalPositions: readonly Point[];
-  readonly newlyHitPenaltyPositions: readonly Point[];
+  readonly newlyHitNormal: readonly NewlyHitTarget[];
+  readonly newlyHitPenalty: readonly NewlyHitTarget[];
   readonly addedPenaltyMs: number;
 } {
-  const newlyHitNormalPositions: Point[] = [];
-  const newlyHitPenaltyPositions: Point[] = [];
+  const newlyHitNormal: NewlyHitTarget[] = [];
+  const newlyHitPenalty: NewlyHitTarget[] = [];
   let addedPenaltyMs = 0;
 
   const updatedTargets = targets.map((target) => {
@@ -152,11 +169,12 @@ function evaluateSweptHits(
     const hitRadius = target.blueprint.radius + CROSSHAIR_HIT_RADIUS;
     const isHit = segmentCircleIntersect(prevCrosshair, nextCrosshair, position, hitRadius);
     if (isHit) {
+      const direction = computeHitPushDirection(prevCrosshair, nextCrosshair, position);
       if (isPenaltyTarget(target.blueprint)) {
-        newlyHitPenaltyPositions.push(position);
+        newlyHitPenalty.push({ position, direction });
         addedPenaltyMs += target.blueprint.penaltyMs ?? 0;
       } else {
-        newlyHitNormalPositions.push(position);
+        newlyHitNormal.push({ position, direction });
       }
       return { ...target, position, hit: true };
     }
@@ -165,8 +183,8 @@ function evaluateSweptHits(
 
   return {
     updatedTargets,
-    newlyHitNormalPositions,
-    newlyHitPenaltyPositions,
+    newlyHitNormal,
+    newlyHitPenalty,
     addedPenaltyMs,
   };
 }
@@ -178,10 +196,15 @@ export function stepGame(
   waves: readonly WaveDefinition[] = DEFAULT_WAVES
 ): GameState {
   if (state.phase === 'TITLE' || state.phase === 'RESULT') {
+    const safeDt = Math.min(50, Math.max(0, dtMs));
+    const agedEffects = state.hitEffects
+      .map((ef) => ({ ...ef, remainingMs: ef.remainingMs - safeDt }))
+      .filter((ef) => ef.remainingMs > 0);
     return {
       ...state,
       crosshair: nextCrosshair,
-      recentTrail: updateTrail(state.recentTrail, nextCrosshair, Math.min(50, Math.max(0, dtMs))),
+      hitEffects: agedEffects,
+      recentTrail: updateTrail(state.recentTrail, nextCrosshair, safeDt),
       audioEvents: [],
     };
   }
@@ -212,32 +235,39 @@ export function stepGame(
     const initialTargets = firstWave ? spawnWaveTargets(firstWave) : [];
     const {
       updatedTargets,
-      newlyHitNormalPositions,
-      newlyHitPenaltyPositions,
+      newlyHitNormal,
+      newlyHitPenalty,
       addedPenaltyMs,
     } = evaluateSweptHits(initialTargets, nextCrosshair, nextCrosshair, 0);
 
-    if (newlyHitNormalPositions.length > 0) {
+    if (newlyHitNormal.length > 0) {
       audioEvents.push('TARGET_HIT');
     }
-    if (newlyHitPenaltyPositions.length > 0) {
+    if (newlyHitPenalty.length > 0) {
       audioEvents.push('PENALTY_HIT');
     }
 
     const hitEffects: HitEffect[] = [
-      ...newlyHitNormalPositions.map((position) => ({
+      ...newlyHitNormal.map(({ position, direction }, idx) => ({
         position,
+        direction,
+        seed: Math.random() + idx * 0.137,
         remainingMs: HIT_EFFECT_DURATION_MS,
+        durationMs: HIT_EFFECT_DURATION_MS,
         kind: 'normal' as const,
       })),
-      ...newlyHitPenaltyPositions.map((position) => ({
+      ...newlyHitPenalty.map(({ position, direction }, idx) => ({
         position,
+        direction,
+        seed: Math.random() + (idx + 7) * 0.193,
         remainingMs: HIT_EFFECT_DURATION_MS,
+        durationMs: HIT_EFFECT_DURATION_MS,
         kind: 'penalty' as const,
       })),
     ];
 
-    const initialPenaltyHits = newlyHitPenaltyPositions.length;
+    const initialNormalHits = newlyHitNormal.length;
+    const initialPenaltyHits = newlyHitPenalty.length;
 
     if (areAllNormalTargetsHit(updatedTargets) && waves.length > 1) {
       audioEvents.push('WAVE_CLEAR');
@@ -248,6 +278,9 @@ export function stepGame(
         waveIndex: 1,
         waveElapsedMs: 0,
         elapsedMs: addedPenaltyMs,
+        playDurationMs: 0,
+        totalDistancePx: 0,
+        normalTargetHits: initialNormalHits,
         penaltyHits: initialPenaltyHits,
         crosshair: nextCrosshair,
         targets: spawnWaveTargets(waves[1]),
@@ -265,6 +298,9 @@ export function stepGame(
       waveIndex: 0,
       waveElapsedMs: 0,
       elapsedMs: addedPenaltyMs,
+      playDurationMs: 0,
+      totalDistancePx: 0,
+      normalTargetHits: initialNormalHits,
       penaltyHits: initialPenaltyHits,
       crosshair: nextCrosshair,
       targets: updatedTargets,
@@ -279,22 +315,29 @@ export function stepGame(
   const clampedDt = Math.min(MAX_PLAYING_DT_MS, Math.max(0, dtMs));
   const nextWaveElapsedMs = state.waveElapsedMs + clampedDt;
   const waveElapsedSec = nextWaveElapsedMs / 1000;
+  const stepDistancePx = Math.hypot(
+    nextCrosshair.x - state.crosshair.x,
+    nextCrosshair.y - state.crosshair.y
+  );
 
   const {
     updatedTargets,
-    newlyHitNormalPositions,
-    newlyHitPenaltyPositions,
+    newlyHitNormal,
+    newlyHitPenalty,
     addedPenaltyMs,
   } = evaluateSweptHits(state.targets, state.crosshair, nextCrosshair, waveElapsedSec);
 
+  const nextPlayDurationMs = state.playDurationMs + clampedDt;
+  const nextTotalDistancePx = state.totalDistancePx + stepDistancePx;
+  const nextNormalTargetHits = state.normalTargetHits + newlyHitNormal.length;
   const nextElapsedMs = state.elapsedMs + clampedDt + addedPenaltyMs;
-  const nextPenaltyHits = state.penaltyHits + newlyHitPenaltyPositions.length;
+  const nextPenaltyHits = state.penaltyHits + newlyHitPenalty.length;
 
   const audioEvents: GameAudioEvent[] = [];
-  if (newlyHitNormalPositions.length > 0) {
+  if (newlyHitNormal.length > 0) {
     audioEvents.push('TARGET_HIT');
   }
-  if (newlyHitPenaltyPositions.length > 0) {
+  if (newlyHitPenalty.length > 0) {
     audioEvents.push('PENALTY_HIT');
   }
 
@@ -303,14 +346,20 @@ export function stepGame(
     .filter((ef) => ef.remainingMs > 0);
   const hitEffects: readonly HitEffect[] = [
     ...agedEffects,
-    ...newlyHitNormalPositions.map((position) => ({
+    ...newlyHitNormal.map(({ position, direction }, idx) => ({
       position,
+      direction,
+      seed: Math.random() + idx * 0.137,
       remainingMs: HIT_EFFECT_DURATION_MS,
+      durationMs: HIT_EFFECT_DURATION_MS,
       kind: 'normal' as const,
     })),
-    ...newlyHitPenaltyPositions.map((position) => ({
+    ...newlyHitPenalty.map(({ position, direction }, idx) => ({
       position,
+      direction,
+      seed: Math.random() + (idx + 7) * 0.193,
       remainingMs: HIT_EFFECT_DURATION_MS,
+      durationMs: HIT_EFFECT_DURATION_MS,
       kind: 'penalty' as const,
     })),
   ];
@@ -325,6 +374,9 @@ export function stepGame(
     return {
       ...state,
       elapsedMs: nextElapsedMs,
+      playDurationMs: nextPlayDurationMs,
+      totalDistancePx: nextTotalDistancePx,
+      normalTargetHits: nextNormalTargetHits,
       penaltyHits: nextPenaltyHits,
       waveElapsedMs: nextWaveElapsedMs,
       crosshair: nextCrosshair,
@@ -344,6 +396,9 @@ export function stepGame(
       waveIndex: nextWaveIndex,
       waveElapsedMs: 0,
       elapsedMs: nextElapsedMs,
+      playDurationMs: nextPlayDurationMs,
+      totalDistancePx: nextTotalDistancePx,
+      normalTargetHits: nextNormalTargetHits,
       penaltyHits: nextPenaltyHits,
       crosshair: nextCrosshair,
       targets: spawnWaveTargets(waves[nextWaveIndex]),
@@ -363,6 +418,9 @@ export function stepGame(
     ...state,
     phase: 'RESULT',
     elapsedMs: nextElapsedMs,
+    playDurationMs: nextPlayDurationMs,
+    totalDistancePx: nextTotalDistancePx,
+    normalTargetHits: nextNormalTargetHits,
     penaltyHits: nextPenaltyHits,
     waveElapsedMs: nextWaveElapsedMs,
     bestTimeMs: nextBestTimeMs,

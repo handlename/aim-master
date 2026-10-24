@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   clearBestTime,
   formatTimeSeconds,
@@ -9,7 +9,12 @@ import {
   saveBestTime,
   shouldResetBestFromSearch,
 } from './storage';
-import { buildShareText, buildXIntentUrl } from './share';
+import {
+  buildShareText,
+  buildXIntentUrl,
+  formatAimStats,
+  renderResultCardToCanvas,
+} from './share';
 
 describe('storage and share helpers', () => {
   it('loads valid best time and rejects corrupt or negative localStorage values', () => {
@@ -68,5 +73,64 @@ describe('storage and share helpers', () => {
     let removedKey = '';
     clearBestTime({ removeItem: (k) => { removedKey = k; } });
     expect(removedKey).toBe('aim_master_best_time_ms');
+  });
+
+  it('formats subtle aim stats (average speed and average hit interval) and renders them on the result card', () => {
+    // 2100 px covered over 5000 ms (5.0s) across 25 normal targets:
+    // avg speed = 420 px/s, avg interval = 5.0 / 25 = 0.20s
+    const stats = formatAimStats({
+      clearTimeMs: 6000,
+      playDurationMs: 5000,
+      totalDistancePx: 2100,
+      normalTargetHits: 25,
+    });
+    expect(stats.avgSpeedLabel).toBe('AVG SPEED: 420 px/s');
+    expect(stats.avgIntervalLabel).toBe('AVG SPLIT: 0.20s');
+
+    // Guard against zero duration or zero hits
+    const zeroStats = formatAimStats({
+      clearTimeMs: 0,
+      playDurationMs: 0,
+      totalDistancePx: 0,
+      normalTargetHits: 0,
+    });
+    expect(zeroStats.avgSpeedLabel).toBe('AVG SPEED: 0 px/s');
+    expect(zeroStats.avgIntervalLabel).toBe('AVG SPLIT: --.--s');
+
+    const fillTextCalls: string[] = [];
+    const mockCtx = {
+      imageSmoothingEnabled: true,
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
+      font: '',
+      textBaseline: 'alphabetic',
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn((text: string) => {
+        fillTextCalls.push(text);
+      }),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+
+    renderResultCardToCanvas(mockCtx, {
+      clearTimeMs: 6000,
+      bestTimeMs: 5500,
+      isNewRecord: false,
+      penaltyHits: 1,
+      playDurationMs: 5000,
+      totalDistancePx: 2100,
+      normalTargetHits: 25,
+      clearedAt: '2026-10-24 15:40:00',
+      fullTrace: [{ x: 120, y: 152 }, { x: 140, y: 160 }],
+    });
+
+    expect(fillTextCalls).toContain('AVG SPEED: 420 px/s');
+    expect(fillTextCalls).toContain('AVG SPLIT: 0.20s');
   });
 });

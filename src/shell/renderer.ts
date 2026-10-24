@@ -1,4 +1,10 @@
-import { ActiveTarget, GameState, isPenaltyTarget } from '../core/game';
+import {
+  ActiveTarget,
+  GameState,
+  HIT_EFFECT_DURATION_MS,
+  HitEffect,
+  isPenaltyTarget,
+} from '../core/game';
 import { formatTimeSeconds } from './storage';
 
 export const LOGICAL_WIDTH = 240;
@@ -9,6 +15,101 @@ export interface FireworkParticle {
   readonly y: number;
   readonly size: number;
   readonly color: string;
+}
+
+export type HitShatterParticle = FireworkParticle;
+
+const NORMAL_SHATTER_COLORS = ['#ff3333', '#ffffff', '#ffcc00', '#ffff00', '#ff6600'] as const;
+const PENALTY_SHATTER_COLORS = ['#0066ff', '#ffffff', '#00ffcc', '#66b2ff'] as const;
+
+function createHitPrng(effect: HitEffect): () => number {
+  const dir = effect.direction ?? { x: 0, y: -1 };
+  const rawSeed =
+    effect.seed !== undefined
+      ? Math.floor(effect.seed * 2147483647)
+      : Math.imul(Math.round(effect.position.x * 131), 73856093) ^
+        Math.imul(Math.round(effect.position.y * 137), 19349663) ^
+        Math.imul(Math.round((dir.x + 2) * 1000), 83492791) ^
+        Math.imul(Math.round((dir.y + 2) * 1000), 49979687);
+
+  let state = (rawSeed | 0) || 123456789;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function computeHitShatterParticles(effect: HitEffect): readonly HitShatterParticle[] {
+  const duration = Math.max(1, effect.durationMs ?? HIT_EFFECT_DURATION_MS);
+  const progress = Math.min(1, Math.max(0, (duration - effect.remainingMs) / duration));
+  const inv = 1 - progress;
+
+  const dir = effect.direction ?? { x: 0, y: -1 };
+  const baseAngle = Math.atan2(dir.y, dir.x);
+  const palette = effect.kind === 'penalty' ? PENALTY_SHATTER_COLORS : NORMAL_SHATTER_COLORS;
+  const rand = createHitPrng(effect);
+  const particles: HitShatterParticle[] = [];
+
+  const shardCount = 18;
+  for (let index = 0; index < shardCount; index++) {
+    // Triangular distribution centered on 0 so most fragments blast forward, with organic random spread
+    const rAngle1 = rand() - 0.5;
+    const rAngle2 = rand() - 0.5;
+    const angleSpread = (rAngle1 + rAngle2) * 1.45;
+    const angle = baseAngle + angleSpread;
+
+    // Randomize travel distance (22px..96px), drag exponent, and gravity per fragment
+    const rSpeed = rand();
+    const maxDistancePx = 22 + rSpeed * rSpeed * 74;
+    const dragPower = 2.2 + rand() * 1.6;
+    const easeOut = 1 - Math.pow(inv, dragPower);
+    const gravityScale = 8 + rand() * 16;
+    const gravityDrop = progress * progress * gravityScale;
+
+    // Slight random spawn offset inside the shattered target body (-5px..+5px)
+    const spawnOffsetX = (rand() - 0.5) * 10;
+    const spawnOffsetY = (rand() - 0.5) * 10;
+
+    const dist = maxDistancePx * easeOut;
+    const x = Math.round(effect.position.x + spawnOffsetX + Math.cos(angle) * dist);
+    const y = Math.round(effect.position.y + spawnOffsetY + Math.sin(angle) * dist + gravityDrop);
+
+    const baseSize = 3 + Math.floor(rand() * 4); // 3..6px
+    const size =
+      progress > 0.75
+        ? Math.max(2, baseSize - 2)
+        : progress > 0.45
+          ? Math.max(2, baseSize - 1)
+          : baseSize;
+
+    const colorIndex = Math.floor(rand() * palette.length);
+    particles.push({
+      x,
+      y,
+      size,
+      color: palette[colorIndex],
+    });
+
+    // Random trailing spark on fast fragments
+    if (rSpeed > 0.42 && progress < 0.85) {
+      const trailFactor = 0.55 + rand() * 0.22;
+      const trailDist = dist * trailFactor;
+      const tx = Math.round(effect.position.x + spawnOffsetX + Math.cos(angle) * trailDist);
+      const ty = Math.round(
+        effect.position.y + spawnOffsetY + Math.sin(angle) * trailDist + gravityDrop * 0.65
+      );
+      particles.push({
+        x: tx,
+        y: ty,
+        size: 2,
+        color: '#ffffff',
+      });
+    }
+  }
+
+  return particles;
 }
 
 interface FireworkLauncher {
@@ -292,24 +393,55 @@ export function renderGame(
     drawTarget(ctx, target);
   }
 
-  // Hit burst effects
+  // Hit burst & directional shatter effects
   for (const effect of state.hitEffects) {
     const ex = Math.round(effect.position.x);
     const ey = Math.round(effect.position.y);
+    const duration = Math.max(1, effect.durationMs ?? HIT_EFFECT_DURATION_MS);
+    const progress = Math.min(1, Math.max(0, (duration - effect.remainingMs) / duration));
+    const dir = effect.direction ?? { x: 0, y: -1 };
+
+    // Intense initial impact flash & shockwave ring shifted slightly toward blast direction
+    if (progress < 0.5) {
+      const flashT = progress / 0.5;
+      const ringRadius = Math.round(8 + flashT * 22);
+      const ringCenterX = Math.round(ex + dir.x * flashT * 10);
+      const ringCenterY = Math.round(ey + dir.y * flashT * 10);
+
+      ctx.strokeStyle =
+        flashT < 0.35 ? '#ffffff' : effect.kind === 'penalty' ? '#00ffcc' : '#ffff00';
+      ctx.lineWidth = flashT < 0.25 ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(ringCenterX, ringCenterY, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const arm = Math.round(12 + flashT * 16);
+      ctx.fillStyle = effect.kind === 'penalty' ? '#00ffcc' : '#ffff00';
+      ctx.fillRect(ex - arm, ey - 2, arm * 2, 4);
+      ctx.fillRect(ex - 2, ey - arm, 4, arm * 2);
+    }
+
+    // Directional shatter fragments pushed opposite to the impacting crosshair with pixel drop shadow
+    const shards = computeHitShatterParticles(effect);
+    for (const shard of shards) {
+      const half = shard.size >> 1;
+      if (shard.size >= 3) {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(shard.x - half + 1, shard.y - half + 1, shard.size, shard.size);
+      }
+      ctx.fillStyle = shard.color;
+      ctx.fillRect(shard.x - half, shard.y - half, shard.size, shard.size);
+    }
+
+    const labelOffsetY = Math.round(progress * 8);
     if (effect.kind === 'penalty') {
-      ctx.fillStyle = '#0066ff';
-      ctx.fillRect(ex - 10, ey - 2, 20, 4);
-      ctx.fillRect(ex - 2, ey - 10, 4, 20);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px monospace';
-      ctx.fillText('+1.0s!', ex - 18, ey - 14);
+      ctx.fillText('+1.0s!', ex - 18, ey - 14 - labelOffsetY);
     } else {
       ctx.fillStyle = '#ffff00';
-      ctx.fillRect(ex - 10, ey - 2, 20, 4);
-      ctx.fillRect(ex - 2, ey - 10, 4, 20);
-      ctx.fillStyle = '#ff5555';
-      ctx.font = 'bold 10px monospace';
-      ctx.fillText('HIT!', ex - 12, ey - 14);
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('HIT!', ex - 12, ey - 14 - labelOffsetY);
     }
   }
 

@@ -145,4 +145,52 @@ describe('waves and game state machine', () => {
     expect(state.elapsedMs).toBeGreaterThan(0);
     expect(state.fullTrace.length).toBeGreaterThan(5);
   });
+
+  it('records directional hit effects and accumulates playDurationMs, totalDistancePx, and normalTargetHits excluding penalty time', () => {
+    const waves: readonly WaveDefinition[] = [
+      {
+        waveNumber: 1,
+        label: 'WAVE 1',
+        targets: [
+          { id: 'n1', anchorX: 100, anchorY: 152, radius: 14, motion: { kind: 'static' } },
+          { id: 'n2', anchorX: 180, anchorY: 152, radius: 14, motion: { kind: 'static' } },
+          {
+            id: 'p1',
+            anchorX: 140,
+            anchorY: 152,
+            radius: 14,
+            penaltyMs: 1000,
+            motion: { kind: 'static' },
+          },
+        ],
+      },
+    ];
+
+    let state = startCountdown(createInitialGameState(null), { x: 60, y: 152 });
+    state = stepGame(state, { x: 60, y: 152 }, COUNTDOWN_DURATION_MS + 10, waves);
+    expect(state.playDurationMs).toBe(0);
+    expect(state.totalDistancePx).toBe(0);
+    expect(state.normalTargetHits).toBe(0);
+
+    // Move right 50px in 25ms -> hits n1 at (100, 152) from the left
+    state = stepGame(state, { x: 110, y: 152 }, 25, waves);
+    expect(state.normalTargetHits).toBe(1);
+    expect(state.totalDistancePx).toBeCloseTo(50, 4);
+    expect(state.playDurationMs).toBe(25);
+    expect(state.hitEffects.length).toBe(1);
+    expect(state.hitEffects[0].direction?.x).toBeGreaterThan(0.8);
+
+    // Move right another 80px in 25ms -> hits p1 (penalty +1000ms) and n2 -> RESULT
+    state = stepGame(state, { x: 190, y: 152 }, 25, waves);
+    expect(state.phase).toBe('RESULT');
+    expect(state.normalTargetHits).toBe(2);
+    expect(state.penaltyHits).toBe(1);
+    expect(state.totalDistancePx).toBeCloseTo(130, 4);
+    expect(state.playDurationMs).toBe(50); // Excludes 1000ms penalty!
+    expect(state.elapsedMs).toBe(1050);
+
+    // Final-hit shatter effect ages cleanly while in RESULT phase
+    const agedResult = stepGame(state, { x: 190, y: 152 }, 40, waves);
+    expect(agedResult.hitEffects[0].remainingMs).toBeLessThan(state.hitEffects[0].remainingMs);
+  });
 });

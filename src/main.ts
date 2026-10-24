@@ -251,6 +251,9 @@ async function handleEnterResult(state: typeof gameState): Promise<void> {
     bestTimeMs: state.bestTimeMs ?? state.elapsedMs,
     isNewRecord: state.isNewRecord,
     penaltyHits: state.penaltyHits,
+    playDurationMs: state.playDurationMs,
+    totalDistancePx: state.totalDistancePx,
+    normalTargetHits: state.normalTargetHits,
     clearedAt,
     fullTrace: state.fullTrace,
   };
