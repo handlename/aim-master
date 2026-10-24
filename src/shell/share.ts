@@ -12,8 +12,9 @@ export interface ResultCardData {
 
 export const PUBLIC_GAME_URL = 'https://handlename.github.io/aim-master/';
 
-export function buildShareText(): string {
-  return `BOOM! NEW HIGH SCORE! 🎯🔥\nAIM MASTER #AIMMASTER\n${PUBLIC_GAME_URL}`;
+export function buildShareText(data: Pick<ResultCardData, 'clearTimeMs'>): string {
+  const timeStr = `${formatTimeSeconds(data.clearTimeMs)}s`;
+  return `BOOM! NEW HIGH SCORE! 🎯🔥\nTIME: ${timeStr}\nAIM MASTER #AIMMASTER\n${PUBLIC_GAME_URL}`;
 }
 
 export function buildXIntentUrl(text: string): string {
@@ -155,10 +156,10 @@ export async function generateResultCardBlob(
 }
 
 export async function shareResult(
-  _data: ResultCardData,
+  data: ResultCardData,
   blob: Blob
 ): Promise<'shared-native' | 'opened-x'> {
-  const text = buildShareText();
+  const text = buildShareText(data);
   const file = new File([blob], 'aim-master-result.png', { type: 'image/png' });
 
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
