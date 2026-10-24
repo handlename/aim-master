@@ -10,13 +10,15 @@ import {
 } from './sensor';
 
 describe('sensor core', () => {
-  it('moves crosshair right when phone pans right (negative gammaRate/alphaRate in vertical posture) and up when tilting up (positive betaRate)', () => {
+  it('moves crosshair right when phone pans right (negative betaRate around Y-axis) and up when tilting up (positive alphaRate around X-axis)', () => {
     const s0 = createInitialSensorState(4.0);
     // Upright portrait: gx = 0, gy = -9.8 (gravity pulls down -Y on device)
+    // In WebKit DeviceMotionEvent.rotationRate:
+    // alpha = X-axis (pitch up/down), beta = Y-axis (yaw/pan left/right when vertical), gamma = Z-axis
     const s1 = stepCrosshairFromMotion(s0, {
-      alphaRate: 0,
-      betaRate: 20, // pitching phone up -> crosshair moves up (smaller Y)
-      gammaRate: -30, // panning phone right -> crosshair moves right (larger X)
+      alphaRate: 20, // pitching phone up around X-axis -> crosshair moves up (smaller Y)
+      betaRate: -30, // panning phone right around Y-axis -> crosshair moves right (larger X)
+      gammaRate: 0,
       gx: 0,
       gy: -9.8,
       gz: 0,
